@@ -87,7 +87,8 @@ create table rotaciones (
   fecha date not null,
   zona_id uuid references zonas not null,
   grupo_curso text not null,   -- agregado, ej. "3-4EP"
-  actividad text not null
+  actividad text not null,
+  responsable text             -- profe voluntario que supervisa (nombre de pila/iniciales)
 );
 
 create table incidencias (
@@ -117,13 +118,32 @@ Conversión GeoJSON ↔ PostGIS: `ST_GeomFromGeoJSON(...)` al guardar,
 `ST_AsGeoJSON(...)` al leer. Áreas/contención nativas: `ST_Area(geography)`,
 `ST_Contains`, `ST_Intersects`.
 
+### Cuentas y roles
+
+Dos niveles de cuenta (la UI ya los simula con el selector de perfil; con Supabase
+se sustituye por auth real):
+
+```sql
+create table usuarios (
+  id uuid primary key references auth.users,
+  centro_id uuid references centros,          -- null para el rol admin
+  rol text not null check (rol in ('centro','admin'))
+);
+```
+
+- **centro**: cuenta propia de cada centro; ve y edita solo sus patios, rotaciones,
+  incidencias, recuentos y encuestas.
+- **admin** (orientación regional): lectura de **todos** los patios y zonas
+  (vista "Centros y patios") y acceso al panel de investigación.
+
 ### RLS (Row Level Security)
 
-- Cada centro solo ve/edita sus propias filas (`centro_id = auth.jwt() ->> 'centro_id'`
-  o tabla puente `usuarios_centros`).
-- El rol investigador regional **solo** accede a vistas agregadas
+- Cada centro solo ve/edita sus propias filas (`centro_id` del usuario vía tabla
+  `usuarios`).
+- El rol admin tiene `select` sobre patios/zonas/rotaciones de todos los centros
+  (solo lectura), y para investigación **solo** accede a vistas agregadas
   (por zona/franja/curso, mínimo k centros o k registros por celda), nunca a las
-  tablas base con detalle de centro salvo consentimiento institucional explícito.
+  tablas base con detalle salvo consentimiento institucional explícito.
 
 ## Protección de datos (decisión de diseño, no negociable)
 

@@ -154,6 +154,30 @@ main { grid-area: principal; position: relative; overflow: hidden; }
 }
 .buscador button:hover { background: var(--hormigon); }
 
+/* Perfiles (demostración): el equipo del centro no ve la capa regional */
+body.perfil-centro .solo-admin { display: none !important; }
+nav.principal .pie #btn-cambiar-perfil {
+  display: block; background: none; border: 1px solid rgba(255,255,255,.25); border-radius: 8px;
+  color: inherit; font-family: var(--fuente-cuerpo); font-size: 11px; cursor: pointer;
+  padding: 4px 9px; margin-bottom: 7px;
+}
+nav.principal .pie #btn-cambiar-perfil:hover { background: rgba(255,255,255,.1); }
+
+/* Tarjetas de la vista Centros (admin) */
+.rejilla-centros { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; max-width: 900px; }
+.tarjeta-centro { border-left: 5px solid var(--hormigon-2); }
+.tarjeta-centro .cabecera-tc { display: flex; align-items: baseline; gap: 8px; }
+.tarjeta-centro h4 { font-family: var(--fuente-titulo); font-size: 14px; }
+.tarjeta-centro .insignia {
+  font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 8px;
+  background: var(--hormigon); color: var(--tinta-suave); flex: none; margin-left: auto;
+}
+.tarjeta-centro .insignia.local { background: #e2f3e9; color: #1e6b43; }
+.tarjeta-centro ul { list-style: none; margin-top: 8px; font-size: 12.5px; display: flex; flex-direction: column; gap: 6px; }
+.tarjeta-centro li { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.tarjeta-centro li .datos { color: var(--tinta-suave); }
+.tarjeta-centro li button { margin-left: auto; }
+
 /* Selector de patio activo */
 .selector-patio {
   width: 100%; padding: 9px 10px; border: 1.5px solid var(--hormigon-2);
@@ -698,9 +722,13 @@ body.modo-hoy .panel-hoy { display: block; }
   <button data-vista="vista-ocupacion" data-titulo="Recuento de ocupación">🙌 Ocupación</button>
   <button data-vista="vista-encuestas" data-titulo="Encuestas de bienestar">💬 Encuestas</button>
   <button data-vista="vista-panel-centro" data-titulo="Panel del centro">📊 Mi panel</button>
-  <div class="grupo">Red regional</div>
-  <button data-vista="vista-regional" data-titulo="Panel de investigación regional">🔬 Investigación</button>
-  <div class="pie">Piloto 2026-27 · v0.1<br>Orientación educativa de La Rioja</div>
+  <div class="grupo solo-admin">Red regional</div>
+  <button class="solo-admin" data-vista="vista-centros" data-titulo="Centros y patios">🗂️ Centros</button>
+  <button class="solo-admin" data-vista="vista-regional" data-titulo="Panel de investigación regional">🔬 Investigación</button>
+  <div class="pie">
+    <button id="btn-cambiar-perfil" title="Cambiar de perfil (demostración)">👤 Perfil</button>
+    Piloto 2026-27 · v0.1<br>Orientación educativa de La Rioja
+  </div>
 </nav>
 
 <main>
@@ -826,6 +854,13 @@ body.modo-hoy .panel-hoy { display: block; }
   <div id="contenido-panel"></div>
 </section>
 
+<section id="vista-centros" class="vista vista-mock">
+  <h2>Centros y patios del piloto</h2>
+  <span class="aviso-fase">🧪 Los centros marcados como demo son ficticios; con la fase de nube aparecerán aquí los centros reales (solo lectura)</span>
+  <p>Vista del equipo de orientación regional: centros participantes y estado de sus patios.</p>
+  <div id="contenido-centros"></div>
+</section>
+
 <section id="vista-regional" class="vista vista-mock">
   <h2>Panel de investigación regional</h2>
   <span class="aviso-fase">🧪 Demostración — 3 centros ficticios con datos inventados; los reales llegarán con Supabase</span>
@@ -878,6 +913,22 @@ body.modo-hoy .panel-hoy { display: block; }
     <div class="pie-modal">
       <button class="boton secundario" id="dividir-cancelar">Cancelar</button>
       <button class="boton" id="dividir-aceptar">Dividir</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Modal: elección de perfil (demostración) ===================== -->
+<div class="velo" id="velo-perfil">
+  <div class="modal">
+    <h2>¿Con qué perfil entras?</h2>
+    <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:4px;">
+      Demostración de los dos niveles de la plataforma. Con la fase de nube, cada centro
+      tendrá su propia cuenta con contraseña y el equipo regional verá todos los centros;
+      de momento este selector solo cambia lo que se muestra en este dispositivo.
+    </p>
+    <div class="botonera-grande" style="grid-template-columns:1fr 1fr; margin-top:10px;">
+      <button id="perfil-eleccion-centro"><span class="ic">🏫</span>Equipo del centro</button>
+      <button id="perfil-eleccion-admin"><span class="ic">🔬</span>Orientación regional (admin)</button>
     </div>
   </div>
 </div>
@@ -1176,13 +1227,14 @@ const DataLayer = {
     const { dia } = diaLectivoHoy();
     const celda = rot && rot.dias && rot.dias[dia] ? rot.dias[dia][zona.id] : null;
     if (celda && (celda.grupo || celda.actividad)) {
-      return { actividad: celda.actividad || 'Juego libre', grupo: celda.grupo || '—', esMock: false };
+      return { actividad: celda.actividad || 'Juego libre', grupo: celda.grupo || '—', responsable: celda.responsable || '', esMock: false };
     }
     const diaAno = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 864e5);
     const lista = ACTIVIDADES_MOCK[zona.tipo] || ACTIVIDADES_MOCK.otra;
     return {
       actividad: lista[(diaAno + indiceZona) % lista.length],
       grupo: GRUPOS_MOCK[(diaAno + indiceZona) % GRUPOS_MOCK.length],
+      responsable: '', // los nombres del profesorado nunca se inventan en el mock
       esMock: true
     };
   }
@@ -1960,10 +2012,11 @@ async function pintarVistaHoy() {
       <div class="zona">${etiquetaZona(z)}</div>
       <div class="act">${rot.actividad}</div>
       <div class="grupos">Grupo: ${rot.grupo}</div>
+      ${rot.responsable ? `<div class="grupos">🧑‍🏫 Responsable: ${rot.responsable}</div>` : ''}
     </div>`;
     z.layer.unbindTooltip();
     z.layer.bindTooltip(
-      `<div class="tit">${etiquetaZona(z)}</div><div class="act">${rot.actividad} · ${rot.grupo}</div>`,
+      `<div class="tit">${etiquetaZona(z)}</div><div class="act">${rot.actividad} · ${rot.grupo}${rot.responsable ? ' · 🧑‍🏫 ' + rot.responsable : ''}</div>`,
       { permanent: true, direction: 'center', className: 'etiqueta-zona' }
     ).openTooltip();
   }
@@ -2165,6 +2218,7 @@ async function generarCartel() {
         <div class="nombre-z">${z.nombre}</div>
         <div class="act-z">${rot.actividad}</div>
         <span class="grupo-z" style="background:${z.color}">${rot.grupo}</span>
+        ${rot.responsable ? `<div class="act-z">🧑‍🏫 ${rot.responsable}</div>` : ''}
       </div>
     </div>`;
   }
@@ -2245,8 +2299,10 @@ let rotacionActual = null;
 async function pintarRotacion() {
   const cont = $('contenido-rotacion');
   if (!rotacionActual) {
-    rotacionActual = (await DataLayer.cargarRotacion()) || { grupos: [...GRUPOS_MOCK], dias: [{}, {}, {}, {}, {}] };
+    rotacionActual = (await DataLayer.cargarRotacion()) || { grupos: [...GRUPOS_MOCK], responsables: [], dias: [{}, {}, {}, {}, {}] };
   }
+  // Rotaciones guardadas antes de existir los responsables
+  if (!rotacionActual.responsables) rotacionActual.responsables = [];
   if (!zonas.length) {
     cont.innerHTML = '<div class="tarjeta" style="max-width:520px;">Primero define el patio y sus zonas en <strong>🗺️ Patio y zonas</strong>.</div>';
     return;
@@ -2258,6 +2314,13 @@ async function pintarRotacion() {
     html += `<span class="chip-grupo">${g}<button data-quitar-grupo="${i}" title="Quitar grupo">✕</button></span>`;
   });
   html += '<input id="nuevo-grupo" placeholder="ej. 5º-6º EP"><button class="boton pequeno" id="btn-anadir-grupo">＋ Añadir</button></div>';
+
+  html += '<h3 style="font-family:var(--fuente-titulo); font-size:15px; margin:12px 0 6px;">Profesorado voluntario (responsables)</h3>' +
+    '<p style="font-size:12.5px; color:var(--tinta-suave); margin-bottom:6px;">Cada actividad puede tener un responsable que la supervisa. Solo nombre de pila o iniciales: aparece en la vista de hoy y en el cartel.</p><div class="chips-grupos">';
+  rotacionActual.responsables.forEach((r, i) => {
+    html += `<span class="chip-grupo">🧑‍🏫 ${r}<button data-quitar-resp="${i}" title="Quitar responsable">✕</button></span>`;
+  });
+  html += '<input id="nuevo-responsable" placeholder="ej. Marta"><button class="boton pequeno" id="btn-anadir-responsable">＋ Añadir</button></div>';
 
   html += '<div class="fila-botones" style="margin-bottom:12px;">' +
     '<button class="boton secundario" id="btn-generar-rotacion">🔄 Generar rotación automática</button>' +
@@ -2271,8 +2334,9 @@ async function pintarRotacion() {
     html += `<tr><th>${etiquetaZona(z)}</th>`;
     for (let d = 0; d < 5; d++) {
       const celda = rotacionActual.dias[d][z.id] || {};
-      // Si la celda guarda un grupo ya eliminado, se conserva como opción para no perderlo en silencio
+      // Si la celda guarda un grupo o responsable ya eliminado, se conserva como opción para no perderlo en silencio
       const opciones = [...new Set([...(celda.grupo ? [celda.grupo] : []), ...rotacionActual.grupos])];
+      const opcResp = [...new Set([...(celda.responsable ? [celda.responsable] : []), ...rotacionActual.responsables])];
       html += `<td class="${d === diaHoy ? 'hoy' : ''}">
         <select data-dia="${d}" data-zona="${z.id}" data-campo="grupo">
           <option value="">— grupo —</option>
@@ -2280,6 +2344,10 @@ async function pintarRotacion() {
         </select>
         <input data-dia="${d}" data-zona="${z.id}" data-campo="actividad" placeholder="Actividad"
           value="${(celda.actividad || '').replace(/"/g, '&quot;')}">
+        <select data-dia="${d}" data-zona="${z.id}" data-campo="responsable" title="Responsable (profe voluntario)">
+          <option value="">— responsable —</option>
+          ${opcResp.map(r => `<option ${r === celda.responsable ? 'selected' : ''}>${r}</option>`).join('')}
+        </select>
       </td>`;
     }
     html += '</tr>';
@@ -2300,6 +2368,19 @@ async function pintarRotacion() {
   });
   $('nuevo-grupo').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-anadir-grupo').click(); });
 
+  cont.querySelectorAll('[data-quitar-resp]').forEach(b => b.addEventListener('click', () => {
+    rotacionActual.responsables.splice(+b.dataset.quitarResp, 1);
+    pintarRotacion();
+  }));
+  $('btn-anadir-responsable').addEventListener('click', () => {
+    const v = $('nuevo-responsable').value.trim();
+    if (!v) return;
+    if (!rotacionActual.responsables.includes(v)) rotacionActual.responsables.push(v);
+    pintarRotacion();
+    $('nuevo-responsable') && $('nuevo-responsable').focus();
+  });
+  $('nuevo-responsable').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-anadir-responsable').click(); });
+
   cont.querySelectorAll('select[data-campo], input[data-campo]').forEach(el => {
     el.addEventListener('change', () => {
       const { dia, zona, campo } = el.dataset;
@@ -2311,17 +2392,19 @@ async function pintarRotacion() {
   $('btn-generar-rotacion').addEventListener('click', () => {
     const gs = rotacionActual.grupos;
     if (!gs.length) { avisar('Añade al menos un grupo antes de generar la rotación.'); return; }
+    const rs = rotacionActual.responsables;
     zonas.forEach((z, i) => {
       const lista = ACTIVIDADES_MOCK[z.tipo] || ACTIVIDADES_MOCK.otra;
       for (let d = 0; d < 5; d++) {
         rotacionActual.dias[d][z.id] = {
           grupo: gs[(i + d) % gs.length],
-          actividad: lista[(i + d) % lista.length]
+          actividad: lista[(i + d) % lista.length],
+          responsable: rs.length ? rs[(i + d) % rs.length] : ''
         };
       }
     });
     pintarRotacion();
-    avisar('Rotación generada: cada grupo pasa por todas las zonas durante la semana. Revísala y guárdala.');
+    avisar('Rotación generada: cada grupo pasa por todas las zonas durante la semana' + (rs.length ? ' y los responsables van rotando' : '') + '. Revísala y guárdala.');
   });
 
   $('btn-guardar-rotacion').addEventListener('click', async () => {
@@ -3174,6 +3257,7 @@ function limpiarMapa() {
 
 async function activarPatio(id) {
   DataLayer.cambiarPatio(id);
+  rotacionActual = null; // la rotación cacheada era la del patio anterior
   const guardado = await DataLayer.cargarPatio();
   limpiarMapa();
   if (guardado) cargarDesdeGeoJSON(guardado);
@@ -3282,6 +3366,85 @@ $('btn-copia-confirmar').addEventListener('click', async () => {
 });
 
 /* ============================================================
+   PERFILES (demostración de los dos niveles de la plataforma).
+   Con Supabase: auth real — usuarios con rol 'centro' (ligados a un
+   centro_id, RLS solo a sus filas) o 'admin' (orientación regional:
+   lectura de todos los patios + vistas agregadas de investigación).
+   ============================================================ */
+const CLAVE_PERFIL = 'patios-dinamicos:perfil';
+let perfilActual = null;
+
+function aplicarPerfil(p) {
+  perfilActual = p;
+  localStorage.setItem(CLAVE_PERFIL, p);
+  document.body.classList.toggle('perfil-centro', p === 'centro');
+  $('btn-cambiar-perfil').textContent = p === 'centro' ? '👤 Equipo del centro · cambiar' : '👤 Orientación regional · cambiar';
+  // Si el centro estaba en una vista de admin, volver al editor
+  if (p === 'centro') {
+    const visible = document.querySelector('.vista.visible');
+    if (visible && (visible.id === 'vista-regional' || visible.id === 'vista-centros')) {
+      document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
+    }
+  }
+  $('velo-perfil').classList.remove('visible');
+}
+
+$('perfil-eleccion-centro').addEventListener('click', () => aplicarPerfil('centro'));
+$('perfil-eleccion-admin').addEventListener('click', () => aplicarPerfil('admin'));
+$('btn-cambiar-perfil').addEventListener('click', () => $('velo-perfil').classList.add('visible'));
+
+/* ---- Vista Centros y patios (solo admin) ---- */
+async function pintarCentros() {
+  const cont = $('contenido-centros');
+
+  // Patios reales de este dispositivo
+  let itemsLocales = '';
+  for (const p of (DataLayer.listarPatios() || [])) {
+    const bruto = localStorage.getItem(`${DataLayer.PREFIJO}:patio:${p.id}`);
+    let resumen = 'sin dibujar todavía';
+    if (bruto) {
+      try {
+        const fc = JSON.parse(bruto);
+        const nZonas = (fc.features || []).filter(f => f.properties && f.properties.rol === 'zona').length;
+        const per = (fc.features || []).find(f => f.properties && f.properties.rol === 'perimetro');
+        resumen = `${nZonas} zona${nZonas === 1 ? '' : 's'}` +
+          (per && per.properties.area_m2 ? ` · ${formatearArea(per.properties.area_m2)}` : '');
+      } catch (e) { /* geojson corrupto: se deja el texto por defecto */ }
+    }
+    const brutoInc = localStorage.getItem(`${DataLayer.PREFIJO}:incidencias:${p.id}`);
+    const inc7 = (brutoInc ? JSON.parse(brutoInc) : []).filter(i => i.fecha >= fechaHaceDias(6)).length;
+    itemsLocales += `<li>🏞️ <strong>${p.nombre}</strong>
+      <span class="datos">${resumen} · ${inc7} incid. 7 días</span>
+      <button class="boton secundario pequeno" data-abrir-patio="${p.id}">Abrir</button></li>`;
+  }
+
+  let html = `<div class="rejilla-centros">
+    <div class="tarjeta tarjeta-centro" style="border-left-color:var(--ok)">
+      <div class="cabecera-tc"><h4>🏫 Este centro</h4><span class="insignia local">este dispositivo</span></div>
+      <ul>${itemsLocales || '<li><span class="datos">Sin patios definidos.</span></li>'}</ul>
+    </div>`;
+
+  for (const c of CENTROS_DEMO) {
+    html += `<div class="tarjeta tarjeta-centro" style="border-left-color:${c.color}">
+      <div class="cabecera-tc"><h4>${etiquetaCentro(c)}</h4><span class="insignia">🧪 demo</span></div>
+      <ul>
+        <li><span class="datos">${c.etapa === 'EP' ? 'Primaria' : 'Secundaria'} · ${c.ruralidad} · ${c.alumnos} alumnos</span></li>
+        <li><span class="datos">Incidencias/100 · jun: <strong>${c.incidencias100[9].toFixed(1).replace('.', ',')}</strong>
+          · participación: <strong>${c.participacion[9]} %</strong></span></li>
+        <li><span class="datos">Con la nube: patio y zonas en solo lectura.</span></li>
+      </ul>
+    </div>`;
+  }
+  html += '</div>';
+  cont.innerHTML = html;
+
+  cont.querySelectorAll('[data-abrir-patio]').forEach(b => b.addEventListener('click', async () => {
+    await activarPatio(b.dataset.abrirPatio);
+    document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
+  }));
+}
+
+/* ============================================================
    NAVEGACIÓN ENTRE VISTAS
    ============================================================ */
 document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
@@ -3297,6 +3460,7 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
     if (b.dataset.vista === 'vista-ocupacion') pintarOcupacion();
     if (b.dataset.vista === 'vista-encuestas') pintarEncuestas();
     if (b.dataset.vista === 'vista-panel-centro') pintarPanelCentro();
+    if (b.dataset.vista === 'vista-centros') pintarCentros();
     if (b.dataset.vista === 'vista-regional') pintarPanelRegional();
   });
 });
@@ -3310,6 +3474,9 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
   const guardado = await DataLayer.cargarPatio();
   if (guardado) cargarDesdeGeoJSON(guardado);
   refrescarTodo();
+  const perfilGuardado = localStorage.getItem(CLAVE_PERFIL);
+  if (perfilGuardado === 'centro' || perfilGuardado === 'admin') aplicarPerfil(perfilGuardado);
+  else $('velo-perfil').classList.add('visible');
 })();
 </script>
 </body>
