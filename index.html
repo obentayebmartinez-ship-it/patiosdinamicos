@@ -1,0 +1,3316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patios Dinámicos · La Rioja</title>
+
+<!-- Leaflet + Leaflet.draw + Turf (CDN, sin API keys) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+<!-- Tipografía: Baloo 2 (títulos) + Atkinson Hyperlegible (cuerpo) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   IDENTIDAD VISUAL — "pintura de patio sobre asfalto"
+   Hormigón claro de fondo, asfalto oscuro en paneles, y los
+   colores de zona son colores de pintura de suelo de patio.
+   ============================================================ */
+:root {
+  --asfalto:      #232d36;
+  --asfalto-2:    #2e3a45;
+  --asfalto-3:    #3a4855;
+  --hormigon:     #f1eee7;
+  --hormigon-2:   #e7e2d6;
+  --tiza:         #ffffff;
+  --tinta:        #26313b;
+  --tinta-suave:  #5b6a77;
+
+  --z-deportiva:  #2f9e63;  /* verde pista */
+  --z-lectura:    #3e7cb1;  /* azul calma */
+  --z-cognitiva:  #d99206;  /* ámbar juego */
+  --z-creativa:   #e4572e;  /* coral pintura */
+  --z-otra:       #7c6fb0;  /* violeta */
+
+  --ok:           #2f9e63;
+  --aviso:        #c94f2a;
+
+  --radio: 10px;
+  --sombra: 0 2px 10px rgba(35,45,54,.14);
+  --fuente-titulo: 'Baloo 2', system-ui, sans-serif;
+  --fuente-cuerpo: 'Atkinson Hyperlegible', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--fuente-cuerpo);
+  color: var(--tinta);
+  background: var(--hormigon);
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "logo cabecera" "nav principal";
+  overflow: hidden;
+}
+
+/* ---------- Cabecera ---------- */
+.logo-caja {
+  grid-area: logo;
+  background: var(--asfalto);
+  color: var(--tiza);
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 2px dashed rgba(255,255,255,.25);
+}
+.logo-caja svg { flex: none; }
+.logo-caja .nombre {
+  font-family: var(--fuente-titulo);
+  font-weight: 800; font-size: 17px; line-height: 1.05;
+}
+.logo-caja .region { font-size: 11px; opacity: .7; letter-spacing: .08em; text-transform: uppercase; }
+
+header.cabecera {
+  grid-area: cabecera;
+  background: var(--tiza);
+  border-bottom: 1px solid var(--hormigon-2);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; gap: 16px; min-height: 58px;
+}
+header.cabecera h1 { font-family: var(--fuente-titulo); font-size: 20px; font-weight: 700; }
+header.cabecera .centro-activo {
+  font-size: 13px; color: var(--tinta-suave);
+  background: var(--hormigon); border: 1px solid var(--hormigon-2);
+  padding: 5px 12px; border-radius: 999px;
+}
+
+/* ---------- Navegación lateral (asfalto) ---------- */
+nav.principal {
+  grid-area: nav;
+  background: var(--asfalto);
+  padding: 14px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto;
+}
+nav.principal .grupo {
+  font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(255,255,255,.45); padding: 12px 10px 5px;
+}
+nav.principal button {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,.82);
+  font-family: var(--fuente-cuerpo); font-size: 13.5px;
+  padding: 9px 10px; border-radius: 8px;
+  border-left: 3px solid transparent;
+}
+nav.principal button:hover { background: var(--asfalto-2); }
+nav.principal button.activo {
+  background: var(--asfalto-2); color: var(--tiza);
+  border-left: 3px solid var(--z-cognitiva);
+  font-weight: 700;
+}
+nav.principal .pie {
+  margin-top: auto; padding: 12px 10px 4px;
+  font-size: 11px; color: rgba(255,255,255,.4);
+  border-top: 2px dashed rgba(255,255,255,.18);
+}
+
+/* ---------- Zona principal ---------- */
+main { grid-area: principal; position: relative; overflow: hidden; }
+.vista { position: absolute; inset: 0; display: none; }
+.vista.visible { display: block; }
+
+/* ---------- Vista del editor de patio ---------- */
+#vista-editor.visible { display: grid; grid-template-columns: 1fr 340px; }
+#mapa { height: 100%; width: 100%; background: #1b232b; }
+
+/* Buscador flotante sobre el mapa */
+.buscador {
+  position: absolute; top: 14px; left: 60px; z-index: 900;
+  display: flex; gap: 6px; align-items: center;
+}
+.buscador input {
+  width: 300px; padding: 9px 12px;
+  border: none; border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  font-family: var(--fuente-cuerpo); font-size: 13.5px;
+}
+.buscador button {
+  background: var(--tiza); border: none; border-radius: var(--radio);
+  box-shadow: var(--sombra); cursor: pointer;
+  padding: 8px 11px; font-size: 15px;
+}
+.buscador button:hover { background: var(--hormigon); }
+
+/* Selector de patio activo */
+.selector-patio {
+  width: 100%; padding: 9px 10px; border: 1.5px solid var(--hormigon-2);
+  border-radius: 10px; font-family: var(--fuente-cuerpo); font-size: 13.5px;
+  font-weight: 700; color: var(--tinta); background: var(--tiza); cursor: pointer;
+}
+
+/* Autocompletado de centros escolares (directorio OSM de La Rioja) */
+#sugerencias-busqueda {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--tiza); border-radius: var(--radio); box-shadow: var(--sombra);
+  max-height: 290px; overflow-y: auto; display: none; z-index: 950;
+}
+#sugerencias-busqueda .sug {
+  display: block; width: 100%; text-align: left; padding: 9px 12px;
+  border: none; border-top: 1px solid var(--hormigon); background: none; cursor: pointer;
+  font-family: var(--fuente-cuerpo); font-size: 13px; color: var(--tinta);
+}
+#sugerencias-busqueda .sug:first-child { border-top: none; }
+#sugerencias-busqueda .sug small { display: block; color: var(--tinta-suave); font-size: 11.5px; }
+#sugerencias-busqueda .sug:hover, #sugerencias-busqueda .sug.activa { background: var(--hormigon); }
+#sugerencias-busqueda .estado { padding: 10px 12px; font-size: 12.5px; color: var(--tinta-suave); }
+
+/* Aviso mientras se dibuja */
+#aviso-dibujo {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 900; display: none;
+  background: var(--asfalto); color: var(--tiza);
+  padding: 9px 16px; border-radius: 999px; font-size: 13px;
+  box-shadow: var(--sombra);
+}
+#aviso-dibujo button {
+  margin-left: 10px; background: var(--asfalto-3); color: var(--tiza);
+  border: none; border-radius: 999px; padding: 3px 10px; cursor: pointer;
+  font-family: var(--fuente-cuerpo);
+}
+
+/* ---------- Panel de herramientas (derecha) ---------- */
+aside.herramientas {
+  background: var(--tiza);
+  border-left: 1px solid var(--hormigon-2);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.tarjeta {
+  background: var(--hormigon); border: 1px solid var(--hormigon-2);
+  border-radius: var(--radio); padding: 13px 14px;
+}
+.tarjeta h3 {
+  font-family: var(--fuente-titulo); font-size: 14.5px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 9px;
+}
+.tarjeta h3 .paso {
+  background: var(--asfalto); color: var(--tiza);
+  width: 21px; height: 21px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; flex: none;
+}
+.tarjeta p.ayuda { font-size: 12px; color: var(--tinta-suave); margin-bottom: 9px; }
+
+.boton {
+  font-family: var(--fuente-cuerpo); font-weight: 700; font-size: 13px;
+  border: none; border-radius: 8px; cursor: pointer;
+  padding: 8px 13px;
+  background: var(--asfalto); color: var(--tiza);
+}
+.boton:hover { background: var(--asfalto-3); }
+.boton.secundario { background: var(--tiza); color: var(--tinta); border: 1.5px solid var(--asfalto); }
+.boton.secundario:hover { background: var(--hormigon-2); }
+.boton.peligro { background: none; color: var(--aviso); border: 1.5px solid var(--aviso); }
+.boton.pequeno { padding: 4px 9px; font-size: 12px; }
+.boton:disabled { opacity: .45; cursor: not-allowed; }
+.fila-botones { display: flex; gap: 7px; flex-wrap: wrap; }
+
+.dato-area {
+  font-size: 12.5px; margin-top: 9px; color: var(--tinta-suave);
+}
+.dato-area strong { color: var(--tinta); font-size: 14px; }
+
+/* Lista de zonas */
+.zona-item {
+  background: var(--tiza); border: 1px solid var(--hormigon-2);
+  border-radius: 8px; padding: 9px 10px; margin-top: 8px;
+}
+.zona-item .linea1 { display: flex; align-items: center; gap: 8px; }
+.zona-item .punto {
+  width: 14px; height: 14px; border-radius: 4px; flex: none;
+  border: 2px solid rgba(0,0,0,.15);
+}
+.zona-item .nombre { font-weight: 700; font-size: 13px; flex: 1; }
+.zona-item .area { font-size: 12px; color: var(--tinta-suave); }
+.zona-item .etiquetas { margin-top: 5px; display: flex; gap: 5px; flex-wrap: wrap; }
+.etiqueta {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700;
+}
+.etiqueta.ok { background: #e2f3e9; color: var(--ok); }
+.etiqueta.aviso { background: #fbe9e2; color: var(--aviso); }
+.etiqueta.tipo { background: var(--hormigon); color: var(--tinta-suave); font-weight: 400; }
+.zona-item .acciones { margin-top: 7px; display: flex; gap: 6px; }
+.zona-item.editando { outline: 2px dashed var(--z-cognitiva); }
+
+/* Estado de guardado */
+#estado-guardado { font-size: 12px; color: var(--tinta-suave); margin-top: 8px; }
+#estado-guardado.ok { color: var(--ok); font-weight: 700; }
+
+/* ---------- Modales ---------- */
+.velo {
+  position: fixed; inset: 0; background: rgba(35,45,54,.55);
+  display: none; align-items: center; justify-content: center; z-index: 2000;
+}
+.velo.visible { display: flex; }
+.modal {
+  background: var(--tiza); border-radius: 14px; box-shadow: var(--sombra);
+  width: min(480px, 92vw); max-height: 88vh; overflow-y: auto;
+  padding: 22px;
+}
+.modal h2 { font-family: var(--fuente-titulo); font-size: 19px; margin-bottom: 14px; }
+.modal label { display: block; font-size: 12.5px; font-weight: 700; margin: 12px 0 4px; }
+.modal input[type=text], .modal select, .modal textarea, .modal input[type=number] {
+  width: 100%; padding: 8px 10px; border: 1.5px solid var(--hormigon-2);
+  border-radius: 8px; font-family: var(--fuente-cuerpo); font-size: 13.5px;
+}
+.modal textarea { font-family: ui-monospace, monospace; font-size: 11.5px; min-height: 220px; }
+.modal .pie-modal { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.selector-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 4px; }
+.selector-tipos button {
+  border: 2px solid var(--hormigon-2); background: var(--tiza); border-radius: 8px;
+  padding: 8px; cursor: pointer; font-family: var(--fuente-cuerpo); font-size: 12.5px;
+  display: flex; align-items: center; gap: 7px; text-align: left;
+}
+.selector-tipos button .punto { width: 13px; height: 13px; border-radius: 4px; flex: none; }
+.selector-tipos button.elegido { border-color: var(--asfalto); font-weight: 700; background: var(--hormigon); }
+.selector-iconos { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 4px; }
+.selector-iconos button {
+  font-size: 19px; padding: 4px 0; line-height: 1.3;
+  background: var(--tiza); border: 2px solid var(--hormigon-2); border-radius: 8px; cursor: pointer;
+}
+.selector-iconos button.elegido { border-color: var(--asfalto); background: var(--hormigon); }
+
+/* ---------- Vista de hoy (solo lectura) ---------- */
+body.modo-hoy aside.herramientas .solo-edicion { display: none; }
+.panel-hoy { display: none; }
+body.modo-hoy .panel-hoy { display: block; }
+.panel-hoy .actividad-hoy {
+  background: var(--tiza); border-radius: 8px; padding: 9px 10px; margin-top: 8px;
+  border-left: 5px solid var(--hormigon-2);
+}
+.panel-hoy .actividad-hoy .zona { font-weight: 700; font-size: 13px; }
+.panel-hoy .actividad-hoy .act { font-size: 13px; }
+.panel-hoy .actividad-hoy .grupos { font-size: 11.5px; color: var(--tinta-suave); }
+.etiqueta-zona {
+  background: rgba(255,255,255,.94) !important; border: none !important;
+  border-radius: 8px !important; box-shadow: var(--sombra) !important;
+  font-family: var(--fuente-cuerpo) !important; padding: 5px 9px !important;
+}
+.etiqueta-zona .tit { font-weight: 700; font-size: 12px; }
+.etiqueta-zona .act { font-size: 11.5px; }
+.etiqueta-zona::before { display: none !important; }
+
+/* Etiqueta fija de zona en el editor (icono + nombre siempre visibles) */
+.etiqueta-zona-mapa {
+  background: rgba(255,255,255,.92) !important; border: none !important;
+  border-radius: 999px !important; box-shadow: 0 1px 5px rgba(0,0,0,.3) !important;
+  font-family: var(--fuente-cuerpo) !important; font-weight: 700; font-size: 12px;
+  color: var(--tinta); padding: 3px 10px !important;
+}
+.etiqueta-zona-mapa::before { display: none !important; }
+
+/* ---------- Vistas mock del resto de módulos ---------- */
+.vista-mock { padding: 28px; overflow-y: auto; height: 100%; }
+.vista-mock h2 { font-family: var(--fuente-titulo); font-size: 22px; margin-bottom: 6px; }
+.vista-mock > p { color: var(--tinta-suave); max-width: 640px; margin-bottom: 18px; font-size: 14px; }
+.aviso-fase {
+  display: inline-block; background: #fdf3d7; color: #8a6205;
+  border-radius: 999px; padding: 4px 13px; font-size: 12px; font-weight: 700;
+  margin-bottom: 18px;
+}
+.mock-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 13px; max-width: 900px; }
+.mock-tarjetas .tarjeta h4 { font-family: var(--fuente-titulo); font-size: 14px; margin-bottom: 5px; }
+.mock-tarjetas .tarjeta p { font-size: 12.5px; color: var(--tinta-suave); }
+.mock-dato { font-family: var(--fuente-titulo); font-size: 26px; font-weight: 800; }
+.mock-dato small { font-size: 12px; color: var(--tinta-suave); font-weight: 400; }
+
+/* ---------- Editor de rotación semanal ---------- */
+.chips-grupos { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; margin: 4px 0 14px; }
+.chip-grupo {
+  background: var(--asfalto); color: var(--tiza); border-radius: 999px;
+  padding: 5px 7px 5px 13px; font-size: 12.5px; font-weight: 700;
+  display: flex; gap: 7px; align-items: center;
+}
+.chip-grupo button {
+  background: none; border: none; color: rgba(255,255,255,.65);
+  cursor: pointer; font-size: 13px; padding: 0 2px;
+}
+.chip-grupo button:hover { color: var(--tiza); }
+.chips-grupos input {
+  padding: 6px 10px; border: 1.5px solid var(--hormigon-2); border-radius: 999px;
+  font-family: var(--fuente-cuerpo); font-size: 12.5px; width: 130px;
+}
+.envoltura-tabla { overflow-x: auto; max-width: 1050px; }
+.tabla-rotacion { border-collapse: collapse; background: var(--tiza); font-size: 12.5px; width: 100%; }
+.tabla-rotacion th, .tabla-rotacion td { border: 1px solid var(--hormigon-2); padding: 7px 8px; text-align: left; vertical-align: top; }
+.tabla-rotacion thead th { background: var(--asfalto); color: var(--tiza); font-family: var(--fuente-titulo); font-weight: 700; }
+.tabla-rotacion thead th.hoy { background: var(--z-cognitiva); }
+.tabla-rotacion tbody th { background: var(--hormigon); font-weight: 700; white-space: nowrap; font-size: 12.5px; }
+.tabla-rotacion td.hoy { background: #fdf7e3; }
+.tabla-rotacion select, .tabla-rotacion input {
+  width: 100%; min-width: 110px; padding: 4px 6px; border: 1px solid var(--hormigon-2);
+  border-radius: 6px; font-family: var(--fuente-cuerpo); font-size: 12px;
+}
+.tabla-rotacion input { margin-top: 4px; }
+
+/* ---------- Móvil: navegación horizontal arriba, una sola columna ---------- */
+@media (max-width: 700px) {
+  body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "logo" "nav" "principal";
+  }
+  header.cabecera { display: none; }
+  .logo-caja { padding: 8px 14px; }
+  nav.principal {
+    flex-direction: row; overflow-x: auto; overflow-y: hidden;
+    padding: 6px 8px; gap: 3px; align-items: center;
+  }
+  nav.principal .grupo, nav.principal .pie { display: none; }
+  nav.principal button {
+    white-space: nowrap; width: auto; flex: none;
+    border-left: none; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0;
+  }
+  nav.principal button.activo { border-left: none; border-bottom: 3px solid var(--z-cognitiva); }
+  #vista-editor.visible { grid-template-columns: 1fr; grid-template-rows: 52% 48%; }
+  .buscador { left: 54px; right: 10px; }
+  .buscador input { width: 100%; min-width: 0; }
+  .vista-mock { padding: 16px; }
+}
+
+/* ---------- Registro rápido de incidencias ---------- */
+.form-incidencia { max-width: 560px; display: flex; flex-direction: column; gap: 15px; }
+.form-incidencia .paso-titulo {
+  font-family: var(--fuente-titulo); font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
+}
+.form-incidencia .paso-titulo .paso {
+  background: var(--asfalto); color: var(--tiza); width: 21px; height: 21px;
+  border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; flex: none;
+}
+#svg-selector-zona svg { width: 100%; max-height: 250px; display: block; }
+#svg-selector-zona polygon[data-zona-sel] { cursor: pointer; }
+.botonera-grande { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.botonera-grande button {
+  padding: 11px 6px; border-radius: 10px; border: 2px solid var(--hormigon-2);
+  background: var(--tiza); cursor: pointer;
+  font-family: var(--fuente-cuerpo); font-weight: 700; font-size: 13px; color: var(--tinta);
+}
+.botonera-grande button .ic { display: block; font-size: 21px; margin-bottom: 3px; }
+.botonera-grande button.elegido { border-color: var(--asfalto); background: var(--hormigon); }
+.botonera-grande button.grav-1.elegido { border-color: var(--ok); background: #e2f3e9; }
+.botonera-grande button.grav-2.elegido { border-color: var(--z-cognitiva); background: #fdf3d7; }
+.botonera-grande button.grav-3.elegido { border-color: var(--aviso); background: #fbe9e2; }
+.chips-curso { display: flex; flex-wrap: wrap; gap: 7px; }
+.chips-curso button {
+  border-radius: 999px; padding: 9px 15px; border: 2px solid var(--hormigon-2);
+  background: var(--tiza); cursor: pointer; font-family: var(--fuente-cuerpo);
+  font-weight: 700; font-size: 13px; color: var(--tinta);
+}
+.chips-curso button.elegido { border-color: var(--asfalto); background: var(--hormigon); }
+.form-incidencia input[type=text] {
+  width: 100%; padding: 10px 12px; border: 1.5px solid var(--hormigon-2);
+  border-radius: 10px; font-family: var(--fuente-cuerpo); font-size: 13.5px;
+}
+#btn-registrar-incidencia { padding: 13px; font-size: 15px; border-radius: 12px; }
+.lista-incidencias { max-width: 560px; margin-top: 20px; }
+.inc-item {
+  background: var(--tiza); border: 1px solid var(--hormigon-2); border-left-width: 5px;
+  border-radius: 8px; padding: 8px 11px; margin-top: 7px;
+  display: flex; align-items: center; gap: 10px; font-size: 12.5px;
+}
+.inc-item .detalle { flex: 1; }
+.inc-item .detalle strong { font-size: 13px; }
+.inc-item .hora { color: var(--tinta-suave); font-weight: 700; }
+.inc-item button { background: none; border: none; color: var(--tinta-suave); cursor: pointer; font-size: 14px; }
+.inc-item button:hover { color: var(--aviso); }
+
+/* ---------- Recuento rápido de ocupación ---------- */
+.form-ocupacion { max-width: 560px; display: flex; flex-direction: column; gap: 10px; }
+.fila-ocupacion {
+  background: var(--tiza); border: 1px solid var(--hormigon-2); border-radius: 10px;
+  padding: 9px 11px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.fila-ocupacion .etiq { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 13px; flex: 1; min-width: 130px; }
+.fila-ocupacion .punto { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.fila-ocupacion .niveles { display: flex; gap: 5px; }
+.fila-ocupacion .niveles button {
+  padding: 6px 10px; border-radius: 8px; border: 2px solid var(--hormigon-2);
+  background: var(--tiza); cursor: pointer; font-family: var(--fuente-cuerpo);
+  font-weight: 700; font-size: 12px; color: var(--tinta);
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+}
+.fila-ocupacion .niveles button .circulo { font-size: 15px; line-height: 1; }
+.fila-ocupacion .niveles button.elegido { border-color: var(--asfalto); background: var(--hormigon); }
+#btn-guardar-ocupacion { padding: 13px; font-size: 15px; border-radius: 12px; margin-top: 4px; }
+
+/* ---------- Encuesta de bienestar ---------- */
+.form-encuesta { max-width: 620px; display: flex; flex-direction: column; gap: 15px; }
+.pestanas-respondente { display: flex; gap: 8px; }
+.pestanas-respondente button {
+  flex: 1; padding: 11px; border-radius: 10px; border: 2px solid var(--hormigon-2);
+  background: var(--tiza); cursor: pointer; font-family: var(--fuente-titulo);
+  font-weight: 700; font-size: 14px; color: var(--tinta);
+}
+.pestanas-respondente button.elegido { border-color: var(--asfalto); background: var(--hormigon); }
+.item-encuesta {
+  background: var(--tiza); border: 1px solid var(--hormigon-2); border-radius: 10px;
+  padding: 11px 13px;
+}
+.item-encuesta .pregunta { font-size: 13.5px; font-weight: 700; margin-bottom: 8px; }
+.escala-likert { display: flex; gap: 6px; }
+.escala-likert button {
+  flex: 1; font-size: 24px; padding: 7px 0; line-height: 1.2;
+  background: var(--hormigon); border: 2px solid transparent; border-radius: 10px; cursor: pointer;
+  filter: grayscale(.65); opacity: .75;
+}
+.escala-likert button:hover { filter: none; opacity: 1; }
+.escala-likert button.elegido {
+  border-color: var(--asfalto); background: var(--tiza);
+  filter: none; opacity: 1; transform: scale(1.08);
+}
+.resumen-encuestas { max-width: 620px; margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ---------- Panel del centro (gráficos) ---------- */
+#contenido-panel { max-width: 940px; display: flex; flex-direction: column; gap: 14px; }
+.panel-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.tile-dato {
+  background: var(--tiza); border: 1px solid var(--hormigon-2); border-radius: var(--radio);
+  padding: 12px 14px;
+}
+.tile-dato .etiq { font-size: 12px; color: var(--tinta-suave); }
+.tile-dato .valor { font-size: 27px; font-weight: 700; color: var(--tinta); line-height: 1.25; }
+.tile-dato .valor small { font-size: 12px; font-weight: 400; color: var(--tinta-suave); }
+.tile-dato .delta { font-size: 12px; font-weight: 700; }
+.tile-dato .delta.malo { color: var(--aviso); }
+.tile-dato .delta.bueno { color: #1d7a4c; }
+.grafico-tarjeta {
+  background: var(--tiza); border: 1px solid var(--hormigon-2); border-radius: var(--radio);
+  padding: 14px 16px;
+}
+.grafico-tarjeta h4 { font-family: var(--fuente-titulo); font-size: 14px; margin-bottom: 12px; }
+.rejilla-graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 700px) { .rejilla-graficos { grid-template-columns: 1fr; } }
+
+/* Barras horizontales: una sola tinta; la identidad de zona va en el punto */
+.fila-barra { display: grid; grid-template-columns: 150px 1fr 38px; gap: 8px; align-items: center; margin-top: 8px; font-size: 12.5px; }
+.fila-barra .etiq { display: flex; align-items: center; gap: 6px; color: var(--tinta); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fila-barra .punto { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.fila-barra .pista { height: 14px; display: flex; align-items: center; }
+.fila-barra .barra { height: 14px; background: #3e7cb1; border-radius: 0 4px 4px 0; min-width: 2px; }
+.fila-barra .num { color: var(--tinta-suave); font-weight: 700; }
+
+/* Columnas por día */
+.cols-dias { display: flex; align-items: flex-end; gap: 4px; height: 110px; border-bottom: 1px solid var(--hormigon-2); }
+.cols-dias .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.cols-dias .col .caja { width: 100%; max-width: 22px; background: #9db9d2; border-radius: 4px 4px 0 0; }
+.cols-dias .col.hoy .caja { background: #3e7cb1; }
+.cols-dias .col .cima { font-size: 10.5px; color: var(--tinta-suave); font-weight: 700; margin-bottom: 2px; }
+.pie-dias { display: flex; gap: 4px; margin-top: 4px; }
+.pie-dias span { flex: 1; text-align: center; font-size: 10px; color: var(--tinta-suave); }
+.pie-dias span.hoy { font-weight: 700; color: var(--tinta); }
+
+/* Gravedad: chips de estado (icono + texto, nunca solo color) */
+.chips-gravedad { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.chip-gravedad { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.chip-gravedad .cuadro { width: 11px; height: 11px; border-radius: 3px; }
+
+.grafico-tarjeta details { margin-top: 10px; font-size: 12px; }
+.grafico-tarjeta details summary { cursor: pointer; color: var(--tinta-suave); }
+.grafico-tarjeta table { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.grafico-tarjeta table th, .grafico-tarjeta table td { border: 1px solid var(--hormigon-2); padding: 4px 9px; text-align: left; }
+
+/* ---------- Panel regional ---------- */
+#contenido-regional { max-width: 980px; display: flex; flex-direction: column; gap: 14px; }
+.fila-filtros {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  background: var(--tiza); border: 1px solid var(--hormigon-2); border-radius: var(--radio);
+  padding: 10px 14px; font-size: 12.5px;
+}
+.fila-filtros label { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.fila-filtros select {
+  padding: 5px 8px; border: 1.5px solid var(--hormigon-2); border-radius: 8px;
+  font-family: var(--fuente-cuerpo); font-size: 12.5px;
+}
+.fila-filtros .separador { flex: 1; }
+.leyenda-series { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 12.5px; }
+.leyenda-series span { display: flex; align-items: center; gap: 6px; }
+.leyenda-series .punto { width: 10px; height: 10px; border-radius: 50%; }
+.grafico-svg svg { width: 100%; height: auto; display: block; }
+
+/* ---------- Avisos (toast no bloqueante) ---------- */
+#toast {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 3000; display: none;
+  background: var(--asfalto); color: var(--tiza);
+  padding: 10px 18px; border-radius: 999px; font-size: 13.5px;
+  box-shadow: var(--sombra); max-width: 80vw;
+  border-left: 5px solid var(--aviso);
+}
+
+/* ---------- Cartel imprimible (A4/A3, diseño para primaria) ---------- */
+#hoja-impresion {
+  position: fixed; inset: 0; z-index: 2500; display: none;
+  background: rgba(35,45,54,.72);
+  flex-direction: column; align-items: center;
+  padding: 16px; overflow: auto; gap: 12px;
+}
+#hoja-impresion.visible { display: flex; }
+.controles-cartel {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+  background: var(--tiza); border-radius: 999px; padding: 8px 16px; box-shadow: var(--sombra);
+  font-size: 13px;
+}
+.controles-cartel select {
+  padding: 5px 8px; border: 1.5px solid var(--hormigon-2); border-radius: 8px;
+  font-family: var(--fuente-cuerpo); font-size: 13px;
+}
+#contenedor-cartel { transform-origin: top center; }
+.cartel {
+  background: #fffdf7;
+  box-shadow: 0 6px 30px rgba(0,0,0,.4);
+  display: flex; flex-direction: column;
+  padding: 9mm;
+  font-family: var(--fuente-cuerpo);
+  /* Imprimir colores e imágenes tal cual, sin que el navegador los "ahorre" */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.cartel .cabecera-cartel { text-align: center; flex: none; }
+.cartel .cabecera-cartel h2 {
+  font-family: var(--fuente-titulo); font-weight: 800; color: var(--tinta);
+  font-size: 13mm; line-height: 1.05; letter-spacing: .01em;
+}
+.cartel .cabecera-cartel .fecha-cartel {
+  font-size: 6.5mm; color: var(--tinta); text-transform: capitalize; font-weight: 700;
+}
+.cartel .cabecera-cartel .centro-cartel { font-size: 4.5mm; color: var(--tinta-suave); }
+.cartel .lineas-patio {
+  display: flex; height: 2.2mm; border-radius: 999px; overflow: hidden; margin: 3mm auto 2mm; width: 70%;
+}
+.cartel .lineas-patio span { flex: 1; }
+.cartel .zona-svg { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.cartel .zona-svg svg { width: 100%; height: 100%; }
+.cartel .leyenda-cartel {
+  flex: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 2.5mm; margin-top: 3mm;
+}
+.cartel .leyenda-item {
+  display: flex; align-items: center; gap: 3mm;
+  border: 1mm solid; border-radius: 4mm; padding: 2mm 3.5mm;
+  background: #fff;
+}
+.cartel .leyenda-item .icono { font-size: 9mm; line-height: 1; }
+.cartel .leyenda-item .textos { min-width: 0; }
+.cartel .leyenda-item .nombre-z { font-family: var(--fuente-titulo); font-weight: 700; font-size: 5mm; line-height: 1.15; }
+.cartel .leyenda-item .act-z { font-size: 4.2mm; }
+.cartel .leyenda-item .grupo-z {
+  font-size: 3.6mm; font-weight: 700; color: #fff;
+  border-radius: 999px; padding: .5mm 2.5mm; display: inline-block; margin-top: .8mm;
+}
+.cartel .pie-cartel {
+  flex: none; text-align: center; font-size: 3.2mm; color: var(--tinta-suave); margin-top: 2.5mm;
+}
+
+@media print {
+  body.cartel-abierto > :not(#hoja-impresion) { display: none !important; }
+  body.cartel-abierto #hoja-impresion { position: static; padding: 0; background: none; overflow: visible; display: block; }
+  .controles-cartel { display: none !important; }
+  #contenedor-cartel { transform: none !important; }
+  .cartel { box-shadow: none; }
+}
+
+/* ---------- Informe regional imprimible (guardar como PDF desde el diálogo) ---------- */
+#hoja-informe { display: none; }
+#hoja-informe .informe {
+  font-family: var(--fuente-cuerpo); color: #26313b; font-size: 12px;
+  print-color-adjust: exact; -webkit-print-color-adjust: exact;
+}
+#hoja-informe h1 { font-family: var(--fuente-titulo); font-size: 22px; margin-bottom: 2px; }
+#hoja-informe h2 { font-family: var(--fuente-titulo); font-size: 14px; margin: 14px 0 6px; }
+#hoja-informe .sub { color: #5c6670; font-size: 11.5px; margin-bottom: 4px; }
+#hoja-informe .aviso-demo {
+  display: inline-block; background: #fdf3d7; border: 1px solid #d99206; border-radius: 6px;
+  padding: 3px 8px; font-size: 10.5px; font-weight: 700; margin: 6px 0 10px;
+}
+#hoja-informe table { border-collapse: collapse; width: 100%; font-size: 10.5px; }
+#hoja-informe th, #hoja-informe td { border: 1px solid #d8d5cc; padding: 4px 6px; text-align: left; }
+#hoja-informe th { background: #f1eee7; font-weight: 700; }
+#hoja-informe .kpis-informe { display: flex; gap: 8px; margin: 8px 0 4px; }
+#hoja-informe .kpis-informe > div { flex: 1; border: 1px solid #d8d5cc; border-radius: 8px; padding: 7px 9px; }
+#hoja-informe .kpis-informe .etiq { font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: #5c6670; }
+#hoja-informe .kpis-informe .valor { font-family: var(--fuente-titulo); font-size: 19px; font-weight: 800; }
+#hoja-informe svg { width: 100%; height: auto; }
+#hoja-informe .leyenda-informe { font-size: 10.5px; margin-bottom: 3px; }
+#hoja-informe .leyenda-informe span { margin-right: 12px; }
+#hoja-informe .leyenda-informe .punto { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+#hoja-informe .pie-informe { margin-top: 14px; font-size: 9.5px; color: #5c6670; border-top: 1px solid #d8d5cc; padding-top: 6px; }
+@media print {
+  body.informe-abierto > :not(#hoja-informe) { display: none !important; }
+  body.informe-abierto #hoja-informe { display: block; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== Logo ===================== -->
+<div class="logo-caja">
+  <!-- Rayuela: guiño al suelo pintado del patio -->
+  <svg width="30" height="38" viewBox="0 0 30 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="8" y="27" width="14" height="9" rx="2" stroke="#e4572e" stroke-width="2"/>
+    <rect x="1" y="17" width="14" height="9" rx="2" stroke="#d99206" stroke-width="2"/>
+    <rect x="15" y="17" width="14" height="9" rx="2" stroke="#3e7cb1" stroke-width="2"/>
+    <rect x="8" y="7" width="14" height="9" rx="2" stroke="#2f9e63" stroke-width="2"/>
+    <circle cx="15" cy="3" r="2.5" fill="#ffffff"/>
+  </svg>
+  <div>
+    <div class="nombre">Patios<br>Dinámicos</div>
+    <div class="region">La Rioja</div>
+  </div>
+</div>
+
+<!-- ===================== Cabecera ===================== -->
+<header class="cabecera">
+  <h1 id="titulo-vista">Configurador de patio</h1>
+  <span class="centro-activo">🏫 CEIP Valdemontes (Logroño) · centro de demostración</span>
+</header>
+
+<!-- ===================== Navegación ===================== -->
+<nav class="principal">
+  <div class="grupo">Mi centro</div>
+  <button class="activo" data-vista="vista-editor" data-titulo="Configurador de patio">🗺️ Patio y zonas</button>
+  <button data-vista="vista-rotacion" data-titulo="Rotación de zonas">🔄 Rotación</button>
+  <button data-vista="vista-incidencias" data-titulo="Registro de incidencia">📝 Incidencias</button>
+  <button data-vista="vista-ocupacion" data-titulo="Recuento de ocupación">🙌 Ocupación</button>
+  <button data-vista="vista-encuestas" data-titulo="Encuestas de bienestar">💬 Encuestas</button>
+  <button data-vista="vista-panel-centro" data-titulo="Panel del centro">📊 Mi panel</button>
+  <div class="grupo">Red regional</div>
+  <button data-vista="vista-regional" data-titulo="Panel de investigación regional">🔬 Investigación</button>
+  <div class="pie">Piloto 2026-27 · v0.1<br>Orientación educativa de La Rioja</div>
+</nav>
+
+<main>
+
+<!-- ===================== VISTA: Editor de patio ===================== -->
+<section id="vista-editor" class="vista visible">
+  <div style="position:relative;">
+    <div id="mapa"></div>
+    <div class="buscador">
+      <input id="entrada-busqueda" type="text" autocomplete="off" placeholder="Busca tu centro (ej. IES Sagasta) o una dirección">
+      <button id="btn-buscar" title="Buscar">🔍</button>
+      <button id="btn-geolocalizar" title="Usar mi ubicación">📍</button>
+      <div id="sugerencias-busqueda"></div>
+    </div>
+    <div id="aviso-dibujo">
+      <span id="aviso-dibujo-texto"></span>
+      <button id="btn-cancelar-dibujo">Cancelar (Esc)</button>
+    </div>
+  </div>
+
+  <aside class="herramientas">
+
+    <div class="tarjeta solo-edicion">
+      <h3>🏫 Patio activo</h3>
+      <p class="ayuda">Si el centro tiene varios patios (infantil, primaria…), cada uno guarda sus zonas, rotación y registros por separado.</p>
+      <select id="selector-patio" class="selector-patio"></select>
+      <div class="fila-botones" style="margin-top:8px;">
+        <button id="btn-patio-nuevo" class="boton secundario pequeno">＋ Nuevo</button>
+        <button id="btn-patio-renombrar" class="boton secundario pequeno">✏️ Renombrar</button>
+        <button id="btn-patio-borrar" class="boton peligro pequeno">Borrar</button>
+      </div>
+    </div>
+
+    <div class="tarjeta solo-edicion">
+      <h3><span class="paso">1</span> Perímetro del patio</h3>
+      <p class="ayuda">Localiza tu patio en la vista satélite y traza su contorno: un clic por esquina, y clic en el primer punto para cerrar.</p>
+      <div class="fila-botones">
+        <button id="btn-dibujar-perimetro" class="boton">✏️ Dibujar perímetro</button>
+        <button id="btn-borrar-perimetro" class="boton peligro pequeno" disabled>Borrar</button>
+      </div>
+      <div class="dato-area" id="dato-perimetro">Sin perímetro definido.</div>
+    </div>
+
+    <div class="tarjeta solo-edicion">
+      <h3><span class="paso">2</span> Zonas del patio</h3>
+      <p class="ayuda">Dibuja cada zona dentro del perímetro, o divide el patio en sectores de área similar como punto de partida.</p>
+      <div class="fila-botones">
+        <button id="btn-dibujar-zona" class="boton" disabled>＋ Dibujar zona</button>
+        <button id="btn-dividir" class="boton secundario" disabled>✂️ Dividir en sectores</button>
+      </div>
+      <div id="lista-zonas"></div>
+      <div id="resumen-validacion" class="dato-area"></div>
+    </div>
+
+    <div class="tarjeta solo-edicion">
+      <h3><span class="paso">3</span> Guardar y compartir</h3>
+      <div class="fila-botones">
+        <button id="btn-guardar" class="boton" disabled>💾 Guardar patio</button>
+        <button id="btn-exportar" class="boton secundario" disabled>Ver GeoJSON</button>
+        <button id="btn-importar" class="boton secundario">Importar</button>
+      </div>
+      <div id="estado-guardado"></div>
+      <div class="fila-botones" style="margin-top:10px;">
+        <button id="btn-ejemplo" class="boton secundario pequeno">🎓 Cargar patio de ejemplo</button>
+      </div>
+      <hr style="border:none; border-top:1px solid var(--hormigon-2); margin:12px 0 10px;">
+      <p class="ayuda">Traspaso entre dispositivos (mientras no hay nube): descarga la copia en un equipo y restáurala en otro. Incluye <strong>todos los patios y todos los registros</strong>.</p>
+      <div class="fila-botones">
+        <button id="btn-copia-exportar" class="boton secundario pequeno">📦 Descargar copia completa</button>
+        <button id="btn-copia-importar" class="boton secundario pequeno">📥 Restaurar copia</button>
+      </div>
+      <input type="file" id="entrada-copia" accept=".json,application/json" style="display:none;">
+      <div id="confirmar-copia" style="display:none; font-size:12.5px; margin-top:9px; background:#fbe9e2; border-radius:8px; padding:9px 11px;">
+        ⚠️ Restaurar la copia <strong>sustituirá todos los datos</strong> de esta app en este dispositivo (patios, rotaciones, incidencias, recuentos y encuestas).
+        <div class="fila-botones" style="margin-top:7px;">
+          <button id="btn-copia-confirmar" class="boton peligro pequeno">Sí, sustituir todo</button>
+          <button id="btn-copia-cancelar" class="boton secundario pequeno">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <h3>👁️ Vista de hoy</h3>
+      <p class="ayuda">Muestra qué actividad toca hoy en cada zona. Pensada para imprimir o proyectar en el panel del patio.</p>
+      <div class="fila-botones">
+        <button id="btn-modo-hoy" class="boton secundario" disabled>Activar vista de hoy</button>
+        <button id="btn-imprimir" class="boton secundario pequeno" style="display:none;">🖨️ Cartel A4/A3</button>
+      </div>
+      <div class="panel-hoy" id="panel-hoy"></div>
+    </div>
+
+  </aside>
+</section>
+
+<!-- ===================== VISTAS MOCK (fase 2) ===================== -->
+<section id="vista-rotacion" class="vista vista-mock">
+  <h2>Rotación semanal de zonas</h2>
+  <p>Asigna a cada zona el grupo y la actividad de cada día lectivo. La <strong>vista de hoy</strong> del mapa y el <strong>cartel imprimible</strong> usan esta tabla automáticamente. Los grupos son siempre agregados (curso/ciclo), nunca alumnos individuales.</p>
+  <div id="contenido-rotacion"></div>
+</section>
+
+<section id="vista-incidencias" class="vista vista-mock">
+  <h2>Registro rápido de incidencia</h2>
+  <p>Cuatro toques y listo, pensado para el móvil durante la guardia. Granularidad mínima: curso/grupo — <strong>nunca se registran alumnos individuales</strong>.</p>
+  <div id="contenido-incidencias"></div>
+</section>
+
+<section id="vista-ocupacion" class="vista vista-mock">
+  <h2>Recuento rápido de ocupación</h2>
+  <p>Una mirada al patio y un toque por zona: ¿cómo de llena está cada una? Así se ve qué zonas funcionan y cuáles se quedan vacías. Es una estimación de grupo — <strong>nunca se cuentan alumnos individuales</strong>.</p>
+  <div id="contenido-ocupacion"></div>
+</section>
+
+<section id="vista-encuestas" class="vista vista-mock">
+  <h2>Encuesta trimestral de bienestar</h2>
+  <p>Anónima y agregada por curso — <strong>nunca se pide el nombre</strong>. La respuesta alimenta la serie temporal del centro y, agregada, la de la red regional.</p>
+  <div id="contenido-encuestas"></div>
+</section>
+
+<section id="vista-panel-centro" class="vista vista-mock">
+  <h2>Panel del centro</h2>
+  <p>Datos reales registrados en la app (incidencias y encuestas de este dispositivo, por ahora). Con Supabase se sumarán todos los dispositivos del centro.</p>
+  <div id="contenido-panel"></div>
+</section>
+
+<section id="vista-regional" class="vista vista-mock">
+  <h2>Panel de investigación regional</h2>
+  <span class="aviso-fase">🧪 Demostración — 3 centros ficticios con datos inventados; los reales llegarán con Supabase</span>
+  <p>Datos <strong>agregados y anonimizados por defecto</strong> de los centros participantes. Ningún dato baja del nivel centro; ningún dato de alumnado individual sube aquí.</p>
+  <div id="contenido-regional"></div>
+</section>
+
+</main>
+
+<!-- ===================== Modal: propiedades de zona ===================== -->
+<div class="velo" id="velo-zona">
+  <div class="modal">
+    <h2 id="modal-zona-titulo">Nueva zona</h2>
+    <label>Nombre de la zona</label>
+    <input type="text" id="zona-nombre" placeholder="ej. Pista de datchball">
+    <label>Tipo</label>
+    <div class="selector-tipos" id="selector-tipos"></div>
+    <label>Icono (aparece en el mapa y en el cartel impreso)</label>
+    <div class="selector-iconos" id="selector-iconos"></div>
+    <label>Color</label>
+    <input type="color" id="zona-color" value="#2f9e63" style="width:60px; height:34px; border:none; cursor:pointer;">
+    <div class="pie-modal">
+      <button class="boton secundario" id="zona-cancelar">Cancelar</button>
+      <button class="boton" id="zona-aceptar">Guardar zona</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Modal: GeoJSON (exportar / importar) ===================== -->
+<div class="velo" id="velo-geojson">
+  <div class="modal">
+    <h2 id="modal-geojson-titulo">GeoJSON del patio</h2>
+    <p class="ayuda" id="modal-geojson-ayuda" style="font-size:12.5px; color:var(--tinta-suave);"></p>
+    <textarea id="geojson-texto" spellcheck="false"></textarea>
+    <div class="pie-modal">
+      <button class="boton secundario" id="geojson-cerrar">Cerrar</button>
+      <button class="boton secundario" id="geojson-descargar" style="display:none;">⬇️ Descargar .geojson</button>
+      <button class="boton" id="geojson-importar" style="display:none;">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Modal: dividir en sectores ===================== -->
+<div class="velo" id="velo-dividir">
+  <div class="modal">
+    <h2>Dividir el patio en sectores</h2>
+    <p style="font-size:13px; color:var(--tinta-suave);">Se crearán sectores de área similar como punto de partida. Después podrás editar sus vértices, renombrarlos y cambiarles el tipo. <strong>Las zonas actuales se sustituirán.</strong></p>
+    <label>Número de sectores (2–6)</label>
+    <input type="number" id="num-sectores" min="2" max="6" value="4">
+    <div class="pie-modal">
+      <button class="boton secundario" id="dividir-cancelar">Cancelar</button>
+      <button class="boton" id="dividir-aceptar">Dividir</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Modal: nombre de patio (nuevo / renombrar) ===================== -->
+<div class="velo" id="velo-patio">
+  <div class="modal">
+    <h2 id="modal-patio-titulo">Nuevo patio</h2>
+    <label>Nombre del patio</label>
+    <input type="text" id="patio-nombre" maxlength="40" placeholder="ej. Patio de infantil">
+    <div class="pie-modal">
+      <button class="boton secundario" id="patio-cancelar">Cancelar</button>
+      <button class="boton" id="patio-aceptar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Cartel imprimible (A4/A3) ===================== -->
+<div id="hoja-impresion">
+  <div class="controles-cartel">
+    <label>Papel
+      <select id="cartel-formato">
+        <option value="A4">A4</option>
+        <option value="A3">A3</option>
+      </select>
+    </label>
+    <label>Orientación
+      <select id="cartel-orientacion">
+        <option value="auto">Automática</option>
+        <option value="apaisado">Horizontal</option>
+        <option value="vertical">Vertical</option>
+      </select>
+    </label>
+    <label>Fondo
+      <select id="cartel-fondo">
+        <option value="foto">Foto aérea</option>
+        <option value="plano">Plano limpio</option>
+      </select>
+    </label>
+    <button class="boton secundario pequeno" id="cartel-girar-izq">⟲ 15°</button>
+    <button class="boton secundario pequeno" id="cartel-girar-der">⟳ 15°</button>
+    <button class="boton secundario pequeno" id="cartel-girar-auto">Encaje automático</button>
+    <button class="boton" id="cartel-imprimir">🖨️ Imprimir</button>
+    <button class="boton secundario pequeno" id="cartel-cerrar">✕ Cerrar</button>
+  </div>
+  <div id="contenedor-cartel">
+    <div class="cartel" id="cartel"></div>
+  </div>
+</div>
+
+<!-- ===================== Informe regional imprimible ===================== -->
+<div id="hoja-informe"></div>
+
+<div id="toast" role="status"></div>
+
+<script>
+/* eslint-disable */
+'use strict';
+
+/* Aviso no bloqueante (sustituye a alert(), que congelaría la app) */
+let toastTemporizador = null;
+function avisar(mensaje) {
+  const t = document.getElementById('toast');
+  t.textContent = mensaje;
+  t.style.display = 'block';
+  clearTimeout(toastTemporizador);
+  toastTemporizador = setTimeout(() => { t.style.display = 'none'; }, 4500);
+}
+
+/* ============================================================
+   CATÁLOGO DE TIPOS DE ZONA
+   ============================================================ */
+const TIPOS_ZONA = {
+  deportiva: { etiqueta: 'Deportiva',        color: '#2f9e63' },
+  lectura:   { etiqueta: 'Lectura y calma',  color: '#3e7cb1' },
+  cognitiva: { etiqueta: 'Juegos cognitivos',color: '#d99206' },
+  creativa:  { etiqueta: 'Creativa',         color: '#e4572e' },
+  otra:      { etiqueta: 'Otra',             color: '#7c6fb0' }
+};
+
+// Icono sugerido por tipo + catálogo que el usuario puede elegir en el modal de zona
+const ICONOS_TIPO = { deportiva: '⚽', lectura: '📖', cognitiva: '🧩', creativa: '🎨', otra: '⭐' };
+const ICONOS_DISPONIBLES = [
+  '⚽', '🏀', '🏐', '🎾', '🏓', '🏸', '🥅', '🤸',
+  '🛝', '🪢', '🎯', '🏃', '📖', '📚', '🤫', '🧘',
+  '🌳', '🧩', '♟️', '🎲', '🔢', '🧠', '🎨', '🎭',
+  '🎵', '✂️', '🖍️', '⭐', '🌈', '🤝', '🐞', '🏰'
+];
+
+// Actividades de ejemplo por tipo, para la "vista de hoy" (mock de rotaciones)
+const ACTIVIDADES_MOCK = {
+  deportiva: ['Datchball', 'Fútbol 3x3', 'Baloncesto por estaciones', 'Circuito de saltos'],
+  lectura:   ['Biblioteca de patio', 'Cuentacuentos entre iguales', 'Rincón de calma'],
+  cognitiva: ['Ajedrez gigante', 'Torneo de damas', 'Juegos de lógica en el suelo'],
+  creativa:  ['Tizas y murales', 'Taller de papiroflexia', 'Teatro improvisado'],
+  otra:      ['Juego libre supervisado', 'Rayuelas y combas']
+};
+const GRUPOS_MOCK = ['1º-2º EP', '3º-4º EP', '5º-6º EP'];
+
+/* ============================================================
+   CAPA DE DATOS  —  ÚNICO punto de contacto con la persistencia.
+   MVP: localStorage.
+   MIGRACIÓN A SUPABASE: sustituir el cuerpo de estas funciones por
+   llamadas a supabase-js manteniendo las mismas firmas async:
+     - guardarPatio(geojson)  →  upsert en `patios` (perimetro) +
+       delete/insert en `zonas` (geometria, nombre, tipo, color).
+       PostGIS: ST_GeomFromGeoJSON(...) con SRID 4326.
+     - cargarPatio()          →  select patios + zonas del centro
+       (RLS filtra por centro_id del usuario autenticado).
+     - rotacionDeHoy(...)     →  select de `rotaciones` where fecha = hoy.
+   ============================================================ */
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+// Día lectivo actual (0=lunes … 4=viernes); en fin de semana se muestra el lunes
+function diaLectivoHoy() {
+  const d = (new Date().getDay() + 6) % 7;
+  return d > 4 ? { dia: 0, finde: true } : { dia: d, finde: false };
+}
+
+const TIPOS_DATO_PATIO = ['patio', 'rotacion', 'incidencias', 'ocupacion', 'encuestas'];
+
+const DataLayer = {
+  PREFIJO: 'patios-dinamicos',
+  CLAVE_LISTA: 'patios-dinamicos:lista-patios',
+  CLAVE_ACTIVO: 'patios-dinamicos:patio-activo',
+  patioActivo: null, // se fija en iniciarPatios()
+
+  // Todas las claves de datos van con el id del patio activo.
+  // Con Supabase el equivalente será el patio_id en cada tabla.
+  _clave(tipo) { return `${this.PREFIJO}:${tipo}:${this.patioActivo}`; },
+
+  /* ---- Gestión de patios (un centro puede tener varios: infantil, primaria…) ---- */
+  listarPatios() {
+    const bruto = localStorage.getItem(this.CLAVE_LISTA);
+    return bruto ? JSON.parse(bruto) : null;
+  },
+
+  _guardarListaPatios(lista) { localStorage.setItem(this.CLAVE_LISTA, JSON.stringify(lista)); },
+
+  // Arranque: crea la lista si no existe. El primer patio conserva el id 'demo'
+  // para heredar los datos guardados antes de que existiera el multi-patio.
+  iniciarPatios() {
+    let lista = this.listarPatios();
+    if (!lista || !lista.length) {
+      lista = [{ id: 'demo', nombre: 'Patio principal' }];
+      this._guardarListaPatios(lista);
+    }
+    const activo = localStorage.getItem(this.CLAVE_ACTIVO);
+    this.patioActivo = lista.some(p => p.id === activo) ? activo : lista[0].id;
+    localStorage.setItem(this.CLAVE_ACTIVO, this.patioActivo);
+    return lista;
+  },
+
+  cambiarPatio(id) {
+    this.patioActivo = id;
+    localStorage.setItem(this.CLAVE_ACTIVO, id);
+  },
+
+  crearPatio(nombre) {
+    const lista = this.listarPatios() || [];
+    const p = { id: 'p' + Date.now(), nombre };
+    lista.push(p);
+    this._guardarListaPatios(lista);
+    return p;
+  },
+
+  renombrarPatio(id, nombre) {
+    const lista = this.listarPatios() || [];
+    const p = lista.find(x => x.id === id);
+    if (p) { p.nombre = nombre; this._guardarListaPatios(lista); }
+  },
+
+  borrarPatio(id) {
+    const lista = (this.listarPatios() || []).filter(p => p.id !== id);
+    this._guardarListaPatios(lista);
+    for (const tipo of TIPOS_DATO_PATIO) localStorage.removeItem(`${this.PREFIJO}:${tipo}:${id}`);
+  },
+
+  /* ---- Copia completa (traspaso entre dispositivos mientras no haya backend) ---- */
+  exportarTodo() {
+    const lista = this.listarPatios() || [];
+    const datos = {};
+    for (const p of lista) {
+      datos[p.id] = {};
+      for (const tipo of TIPOS_DATO_PATIO) {
+        const bruto = localStorage.getItem(`${this.PREFIJO}:${tipo}:${p.id}`);
+        if (bruto) datos[p.id][tipo] = JSON.parse(bruto);
+      }
+    }
+    return { formato: 'patios-dinamicos-copia', version: 1, exportado: new Date().toISOString(), patios: lista, datos };
+  },
+
+  importarTodo(copia) {
+    if (copia.formato !== 'patios-dinamicos-copia' || !Array.isArray(copia.patios) || !copia.patios.length) {
+      throw new Error('El archivo no es una copia de Patios Dinámicos');
+    }
+    for (const p of this.listarPatios() || []) this.borrarPatio(p.id);
+    this._guardarListaPatios(copia.patios);
+    for (const p of copia.patios) {
+      const d = (copia.datos || {})[p.id] || {};
+      for (const [tipo, valor] of Object.entries(d)) {
+        if (TIPOS_DATO_PATIO.includes(tipo)) localStorage.setItem(`${this.PREFIJO}:${tipo}:${p.id}`, JSON.stringify(valor));
+      }
+    }
+    this.cambiarPatio(copia.patios[0].id);
+  },
+
+  /* ---- Datos del patio activo ---- */
+  async guardarPatio(geojson) {
+    localStorage.setItem(this._clave('patio'), JSON.stringify(geojson));
+    return { ok: true, fecha: new Date() };
+  },
+
+  async cargarPatio() {
+    const bruto = localStorage.getItem(this._clave('patio'));
+    return bruto ? JSON.parse(bruto) : null;
+  },
+
+  // Rotación semanal: { grupos: [...], dias: [ { zonaId: {grupo, actividad} } ×5 ] }
+  // Con Supabase: upsert/select en la tabla `rotaciones` (fecha, zona_id, grupo_curso, actividad).
+  async guardarRotacion(rotacion) {
+    localStorage.setItem(this._clave('rotacion'), JSON.stringify(rotacion));
+    return { ok: true };
+  },
+
+  async cargarRotacion() {
+    const bruto = localStorage.getItem(this._clave('rotacion'));
+    return bruto ? JSON.parse(bruto) : null;
+  },
+
+  // Incidencias: array de { id, fecha, hora, zonaId, zonaNombre, tipo, curso, gravedad, franja, nota }
+  // Con Supabase: insert/select/delete en la tabla `incidencias` (RLS por centro_id).
+  async guardarIncidencia(inc) {
+    const lista = await this.listarIncidencias();
+    inc.id = 'i' + Date.now();
+    lista.push(inc);
+    localStorage.setItem(this._clave('incidencias'), JSON.stringify(lista));
+    return { ok: true, id: inc.id };
+  },
+
+  async listarIncidencias(fecha) {
+    const bruto = localStorage.getItem(this._clave('incidencias'));
+    const lista = bruto ? JSON.parse(bruto) : [];
+    return fecha ? lista.filter(i => i.fecha === fecha) : lista;
+  },
+
+  async borrarIncidencia(id) {
+    const lista = (await this.listarIncidencias()).filter(i => i.id !== id);
+    localStorage.setItem(this._clave('incidencias'), JSON.stringify(lista));
+    return { ok: true };
+  },
+
+  // Ocupación de zonas: array de { id, fecha, hora, niveles: { zonaId: 0-3 } }
+  // (0 vacía · 1 poca · 2 media · 3 llena). Estimación de grupo, nunca conteo de alumnos.
+  // Con Supabase: insert/select/delete en la tabla `ocupaciones` (RLS por centro_id).
+  async guardarOcupacion(reg) {
+    const lista = await this.listarOcupaciones();
+    reg.id = 'o' + Date.now();
+    lista.push(reg);
+    localStorage.setItem(this._clave('ocupacion'), JSON.stringify(lista));
+    return { ok: true, id: reg.id };
+  },
+
+  async listarOcupaciones(fecha) {
+    const bruto = localStorage.getItem(this._clave('ocupacion'));
+    const lista = bruto ? JSON.parse(bruto) : [];
+    return fecha ? lista.filter(o => o.fecha === fecha) : lista;
+  },
+
+  async borrarOcupacion(id) {
+    const lista = (await this.listarOcupaciones()).filter(o => o.id !== id);
+    localStorage.setItem(this._clave('ocupacion'), JSON.stringify(lista));
+    return { ok: true };
+  },
+
+  // Encuestas de bienestar: array de { id, fecha, trimestre, tipoRespondente,
+  // curso, puntuacion (media 1-5), respuestas (por ítem), comentario }.
+  // Con Supabase: insert en `encuestas_bienestar` (anónimo: sin user_id).
+  async guardarEncuesta(enc) {
+    const lista = await this.listarEncuestas();
+    enc.id = 'e' + Date.now();
+    lista.push(enc);
+    localStorage.setItem(this._clave('encuestas'), JSON.stringify(lista));
+    return { ok: true };
+  },
+
+  async listarEncuestas() {
+    const bruto = localStorage.getItem(this._clave('encuestas'));
+    return bruto ? JSON.parse(bruto) : [];
+  },
+
+  // Asignación de hoy para una zona: usa la rotación configurada si existe;
+  // si no, un mock determinista por tipo (marcado con esMock para avisar en la UI).
+  async rotacionDeHoy(zona, indiceZona) {
+    const rot = await this.cargarRotacion();
+    const { dia } = diaLectivoHoy();
+    const celda = rot && rot.dias && rot.dias[dia] ? rot.dias[dia][zona.id] : null;
+    if (celda && (celda.grupo || celda.actividad)) {
+      return { actividad: celda.actividad || 'Juego libre', grupo: celda.grupo || '—', esMock: false };
+    }
+    const diaAno = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 864e5);
+    const lista = ACTIVIDADES_MOCK[zona.tipo] || ACTIVIDADES_MOCK.otra;
+    return {
+      actividad: lista[(diaAno + indiceZona) % lista.length],
+      grupo: GRUPOS_MOCK[(diaAno + indiceZona) % GRUPOS_MOCK.length],
+      esMock: true
+    };
+  }
+};
+
+/* ============================================================
+   MAPA
+   ============================================================ */
+const mapa = L.map('mapa', {
+  zoomControl: true,
+  // leaflet-rotate: girar con el control ⟳, con dos dedos (táctil) o Mayús+arrastrar
+  rotate: true,
+  rotateControl: { closeOnZeroBearing: false },
+  touchRotate: true,
+  shiftKeyRotate: true
+}).setView([42.4627, -2.4449], 17); // Logroño
+
+// PNOA Máxima Actualidad (IGN España): ortofoto oficial más reciente, 25 cm/px,
+// gratuita y sin API key. Mucho más nítida y actual que el mosaico global de Esri.
+const capaPNOA = L.tileLayer(
+  'https://www.ign.es/wmts/pnoa-ma?service=WMTS&request=GetTile&version=1.0.0' +
+  '&layer=OI.OrthoimageCoverage&style=default&format=image/jpeg' +
+  '&tilematrixset=GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}',
+  { maxZoom: 21, maxNativeZoom: 19, attribution: 'Ortofoto PNOA © IGN España' }
+);
+
+const capaEsri = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom: 21, maxNativeZoom: 19, attribution: 'Imágenes © Esri World Imagery' }
+);
+
+// Callejero del IGN: útil para orientarse cuando la ortofoto confunde (arbolado, sombras)
+const capaCallejero = L.tileLayer(
+  'https://www.ign.es/wmts/ign-base?service=WMTS&request=GetTile&version=1.0.0' +
+  '&layer=IGNBaseTodo&style=default&format=image/jpeg' +
+  '&tilematrixset=GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}',
+  { maxZoom: 21, maxNativeZoom: 19, attribution: 'Cartografía © IGN España' }
+);
+
+// Catastro (Dirección General del Catastro, WMS gratuito): parcelas y edificios
+// como líneas sobre fondo transparente. Útil cuando el arbolado tapa el patio:
+// el límite catastral de la parcela del centro se ve aunque haya árboles encima.
+// El servicio solo dibuja a escalas grandes, de ahí el minZoom.
+const capaCatastro = L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', {
+  layers: 'Catastro',
+  format: 'image/png',
+  transparent: true,
+  minZoom: 15,
+  maxZoom: 21,
+  attribution: '© Dirección General del Catastro'
+});
+
+capaPNOA.addTo(mapa);
+L.control.layers(
+  { 'Satélite PNOA (IGN, más reciente)': capaPNOA, 'Satélite Esri (mundial)': capaEsri, 'Callejero IGN': capaCallejero },
+  { 'Parcelas Catastro (líneas)': capaCatastro },
+  { position: 'topright', collapsed: false }
+).addTo(mapa);
+
+mapa.on('overlayadd', e => {
+  if (e.layer !== capaCatastro) return;
+  if (mapa.getZoom() < 15) avisar('Acércate más al patio para ver las líneas del Catastro.');
+  else avisar('Catastro activado: las líneas marcan parcelas y edificios, útil si los árboles tapan el patio.');
+});
+
+// Textos de Leaflet.draw en castellano
+L.drawLocal.draw.handlers.polygon.tooltip = {
+  start: 'Haz clic para colocar el primer vértice',
+  cont:  'Haz clic para añadir vértices',
+  end:   'Haz clic en el primer punto para cerrar el polígono'
+};
+
+const ESTILO_PERIMETRO = { color: '#ffffff', weight: 3, dashArray: '8 6', fillColor: '#ffffff', fillOpacity: 0.04 };
+function estiloZona(color) { return { color: color, weight: 2.5, fillColor: color, fillOpacity: 0.35 }; }
+
+/* ============================================================
+   ESTADO
+   ============================================================ */
+let perimetroLayer = null;          // L.Polygon
+let zonas = [];                     // [{ id, nombre, tipo, color, layer }]
+let contadorZona = 0;
+let dibujando = null;               // handler L.Draw.Polygon activo
+let proposito = null;               // 'perimetro' | 'zona'
+let capaPendiente = null;           // polígono recién dibujado a la espera del modal
+let zonaEnEdicion = null;           // id de la zona editando propiedades (modal)
+let zonaEditandoVertices = null;    // id de la zona con edición de vértices activa
+let tipoElegido = 'deportiva';
+let iconoElegido = '⚽';
+let modoHoy = false;
+let marcadorBusqueda = null;
+
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   DIBUJO DE POLÍGONOS
+   ============================================================ */
+function enderezarMapa() {
+  // Leaflet.draw calcula mal los vértices con el mapa girado: dibujar siempre con norte arriba
+  if (mapa.getBearing && mapa.getBearing() !== 0) {
+    mapa.setBearing(0);
+    avisar('El mapa se ha enderezado (norte arriba) para dibujar con precisión.');
+  }
+}
+
+function empezarDibujo(objetivo) {
+  cancelarDibujo();
+  enderezarMapa();
+  proposito = objetivo;
+  const estilo = objetivo === 'perimetro' ? ESTILO_PERIMETRO : estiloZona(TIPOS_ZONA[tipoElegido].color);
+  dibujando = new L.Draw.Polygon(mapa, {
+    allowIntersection: false,
+    showArea: false,
+    shapeOptions: estilo
+  });
+  dibujando.enable();
+  $('aviso-dibujo-texto').textContent = objetivo === 'perimetro'
+    ? 'Dibujando el perímetro del patio — clic por esquina, cierra en el primer punto'
+    : 'Dibujando una zona — debe quedar dentro del perímetro';
+  $('aviso-dibujo').style.display = 'block';
+}
+
+function cancelarDibujo() {
+  if (dibujando) { dibujando.disable(); dibujando = null; }
+  proposito = null;
+  $('aviso-dibujo').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cancelarDibujo(); });
+$('btn-cancelar-dibujo').addEventListener('click', cancelarDibujo);
+
+mapa.on(L.Draw.Event.CREATED, e => {
+  const capa = e.layer;
+  $('aviso-dibujo').style.display = 'none';
+  dibujando = null;
+
+  if (proposito === 'perimetro') {
+    fijarPerimetro(capa);
+  } else if (proposito === 'zona') {
+    capaPendiente = capa;
+    capa.addTo(mapa);
+    abrirModalZona(null); // pedir nombre y tipo
+  }
+  proposito = null;
+});
+
+/* ============================================================
+   PERÍMETRO
+   ============================================================ */
+function fijarPerimetro(capa) {
+  if (perimetroLayer) mapa.removeLayer(perimetroLayer);
+  perimetroLayer = capa;
+  capa.setStyle(ESTILO_PERIMETRO);
+  capa.addTo(mapa);
+  refrescarTodo();
+}
+
+$('btn-dibujar-perimetro').addEventListener('click', () => empezarDibujo('perimetro'));
+
+$('btn-borrar-perimetro').addEventListener('click', () => {
+  if (!confirm('¿Borrar el perímetro? Las zonas dibujadas se conservan, pero quedarán sin validar.')) return;
+  mapa.removeLayer(perimetroLayer);
+  perimetroLayer = null;
+  refrescarTodo();
+});
+
+/* ============================================================
+   ZONAS
+   ============================================================ */
+$('btn-dibujar-zona').addEventListener('click', () => empezarDibujo('zona'));
+
+function crearZona(capa, nombre, tipo, color, icono) {
+  contadorZona++;
+  // icono === '' significa "sin icono" (elegido a propósito); undefined → el del tipo
+  const z = { id: 'z' + contadorZona, nombre, tipo, color, icono: icono ?? (ICONOS_TIPO[tipo] || '⭐'), layer: capa };
+  capa.setStyle(estiloZona(color));
+  if (!mapa.hasLayer(capa)) capa.addTo(mapa);
+  etiquetarEnMapa(z);
+  zonas.push(z);
+  return z;
+}
+
+function etiquetaZona(z) { return (z.icono ? z.icono + ' ' : '') + z.nombre; }
+
+// Etiqueta fija sobre la zona (visible sin pasar el ratón)
+function etiquetarEnMapa(z) {
+  z.layer.unbindTooltip();
+  z.layer.bindTooltip(etiquetaZona(z), { permanent: true, direction: 'center', className: 'etiqueta-zona-mapa' });
+}
+
+function borrarZona(id) {
+  const i = zonas.findIndex(z => z.id === id);
+  if (i === -1) return;
+  if (zonaEditandoVertices === id) terminarEdicionVertices();
+  mapa.removeLayer(zonas[i].layer);
+  zonas.splice(i, 1);
+  refrescarTodo();
+}
+
+function borrarTodasLasZonas() {
+  terminarEdicionVertices();
+  zonas.forEach(z => mapa.removeLayer(z.layer));
+  zonas = [];
+}
+
+/* ---------- Edición de vértices (Leaflet.draw: layer.editing) ---------- */
+function alternarEdicionVertices(id) {
+  if (zonaEditandoVertices === id) { terminarEdicionVertices(); return; }
+  terminarEdicionVertices();
+  const z = zonas.find(x => x.id === id);
+  if (!z) return;
+  enderezarMapa();
+  z.layer.editing.enable();
+  zonaEditandoVertices = id;
+  pintarListaZonas();
+}
+
+function terminarEdicionVertices() {
+  if (!zonaEditandoVertices) return;
+  const z = zonas.find(x => x.id === zonaEditandoVertices);
+  if (z) z.layer.editing.disable();
+  zonaEditandoVertices = null;
+  refrescarTodo();
+}
+
+/* ============================================================
+   VALIDACIÓN GEOMÉTRICA (turf.js)
+   - contención dentro del perímetro (tolerancia 1 % de área fuera)
+   - solapamiento entre zonas (umbral 1 m²)
+   - área en m²
+   ============================================================ */
+function validarZona(z) {
+  const res = { area: 0, dentro: null, pctFuera: 0, solapes: [] };
+  const gz = z.layer.toGeoJSON();
+  res.area = turf.area(gz);
+
+  if (perimetroLayer) {
+    const gp = perimetroLayer.toGeoJSON();
+    if (turf.booleanWithin(gz, gp)) {
+      res.dentro = true;
+    } else {
+      const fuera = turf.difference(gz, gp);
+      res.pctFuera = fuera ? (turf.area(fuera) / res.area) * 100 : 0;
+      res.dentro = res.pctFuera < 1; // tolerancia para bordes compartidos
+    }
+  }
+
+  for (const otra of zonas) {
+    if (otra.id === z.id) continue;
+    try {
+      const inter = turf.intersect(gz, otra.layer.toGeoJSON());
+      if (inter && turf.area(inter) > 1) res.solapes.push(otra.nombre);
+    } catch (_) { /* geometrías degeneradas: ignorar */ }
+  }
+  return res;
+}
+
+function formatearArea(m2) {
+  return m2 >= 10000 ? (m2 / 10000).toFixed(2) + ' ha' : Math.round(m2).toLocaleString('es-ES') + ' m²';
+}
+
+/* ============================================================
+   DIVIDIR EL PERÍMETRO EN N SECTORES DE ÁREA SIMILAR
+   Cortes verticales por búsqueda binaria sobre la longitud,
+   de modo que cada franja acumule 1/N del área total.
+   ============================================================ */
+function dividirEnSectores(n) {
+  const gp = perimetroLayer.toGeoJSON();
+  const total = turf.area(gp);
+  const [minX, minY, maxX, maxY] = turf.bbox(gp);
+
+  const cortes = [minX];
+  for (let i = 1; i < n; i++) {
+    let lo = cortes[i - 1], hi = maxX;
+    const objetivo = (total * i) / n;
+    for (let k = 0; k < 45; k++) {
+      const medio = (lo + hi) / 2;
+      const franja = turf.bboxClip(gp, [minX, minY, medio, maxY]);
+      if (turf.area(franja) < objetivo) lo = medio; else hi = medio;
+    }
+    cortes.push((lo + hi) / 2);
+  }
+  cortes.push(maxX);
+
+  const sectores = [];
+  for (let i = 0; i < n; i++) {
+    const trozo = turf.bboxClip(gp, [cortes[i], minY, cortes[i + 1], maxY]);
+    // bboxClip puede devolver MultiPolygon si el corte parte el patio en islas
+    for (const f of turf.flatten(trozo).features) {
+      if (turf.area(f) > 2) sectores.push(f);
+    }
+  }
+  return sectores;
+}
+
+$('btn-dividir').addEventListener('click', () => $('velo-dividir').classList.add('visible'));
+$('dividir-cancelar').addEventListener('click', () => $('velo-dividir').classList.remove('visible'));
+$('dividir-aceptar').addEventListener('click', () => {
+  const n = Math.min(6, Math.max(2, parseInt($('num-sectores').value, 10) || 4));
+  $('velo-dividir').classList.remove('visible');
+  borrarTodasLasZonas();
+  const claves = Object.keys(TIPOS_ZONA);
+  dividirEnSectores(n).forEach((f, i) => {
+    const tipo = claves[i % (claves.length - 1)]; // rota tipos, sin 'otra'
+    const anillos = f.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
+    const capa = L.polygon(anillos, estiloZona(TIPOS_ZONA[tipo].color));
+    crearZona(capa, 'Sector ' + (i + 1), tipo, TIPOS_ZONA[tipo].color, ICONOS_TIPO[tipo]);
+  });
+  refrescarTodo();
+});
+
+/* ============================================================
+   MODAL DE PROPIEDADES DE ZONA
+   ============================================================ */
+function pintarSelectorTipos() {
+  const cont = $('selector-tipos');
+  cont.innerHTML = '';
+  for (const [clave, t] of Object.entries(TIPOS_ZONA)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<span class="punto" style="background:${t.color}"></span>${t.etiqueta}`;
+    b.classList.toggle('elegido', clave === tipoElegido);
+    b.addEventListener('click', () => {
+      tipoElegido = clave;
+      $('zona-color').value = t.color;
+      iconoElegido = ICONOS_TIPO[clave]; // sugerencia; el usuario puede cambiarla debajo
+      pintarSelectorTipos();
+      pintarSelectorIconos();
+    });
+    cont.appendChild(b);
+  }
+}
+
+function pintarSelectorIconos() {
+  const cont = $('selector-iconos');
+  cont.innerHTML = '';
+  // Primera opción: sin icono (icono = cadena vacía)
+  const bNada = document.createElement('button');
+  bNada.type = 'button';
+  bNada.textContent = '—';
+  bNada.title = 'Sin icono';
+  bNada.classList.toggle('elegido', iconoElegido === '');
+  bNada.addEventListener('click', () => { iconoElegido = ''; pintarSelectorIconos(); });
+  cont.appendChild(bNada);
+  for (const icono of ICONOS_DISPONIBLES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = icono;
+    b.classList.toggle('elegido', icono === iconoElegido);
+    b.addEventListener('click', () => { iconoElegido = icono; pintarSelectorIconos(); });
+    cont.appendChild(b);
+  }
+}
+
+function abrirModalZona(idZona) {
+  zonaEnEdicion = idZona;
+  const z = idZona ? zonas.find(x => x.id === idZona) : null;
+  $('modal-zona-titulo').textContent = z ? 'Editar zona' : 'Nueva zona';
+  $('zona-nombre').value = z ? z.nombre : '';
+  tipoElegido = z ? z.tipo : 'deportiva';
+  iconoElegido = z ? (z.icono ?? ICONOS_TIPO[z.tipo]) : ICONOS_TIPO[tipoElegido];
+  $('zona-color').value = z ? z.color : TIPOS_ZONA[tipoElegido].color;
+  pintarSelectorTipos();
+  pintarSelectorIconos();
+  $('velo-zona').classList.add('visible');
+  $('zona-nombre').focus();
+}
+
+$('zona-cancelar').addEventListener('click', () => {
+  $('velo-zona').classList.remove('visible');
+  if (capaPendiente) { mapa.removeLayer(capaPendiente); capaPendiente = null; }
+  zonaEnEdicion = null;
+});
+
+$('zona-aceptar').addEventListener('click', () => {
+  const nombre = $('zona-nombre').value.trim() || TIPOS_ZONA[tipoElegido].etiqueta;
+  const color = $('zona-color').value;
+
+  if (zonaEnEdicion) {
+    const z = zonas.find(x => x.id === zonaEnEdicion);
+    z.nombre = nombre; z.tipo = tipoElegido; z.color = color; z.icono = iconoElegido;
+    z.layer.setStyle(estiloZona(color));
+    etiquetarEnMapa(z);
+  } else if (capaPendiente) {
+    crearZona(capaPendiente, nombre, tipoElegido, color, iconoElegido);
+    capaPendiente = null;
+  }
+  zonaEnEdicion = null;
+  $('velo-zona').classList.remove('visible');
+  refrescarTodo();
+});
+
+/* ============================================================
+   RENDER DEL PANEL LATERAL
+   ============================================================ */
+function pintarListaZonas() {
+  const cont = $('lista-zonas');
+  cont.innerHTML = '';
+  if (!zonas.length) {
+    cont.innerHTML = '<div class="dato-area">Aún no hay zonas.</div>';
+    return;
+  }
+  for (const z of zonas) {
+    const v = validarZona(z);
+    const div = document.createElement('div');
+    div.className = 'zona-item' + (zonaEditandoVertices === z.id ? ' editando' : '');
+
+    let etiquetas = `<span class="etiqueta tipo">${TIPOS_ZONA[z.tipo].etiqueta}</span>`;
+    if (perimetroLayer) {
+      etiquetas += v.dentro
+        ? '<span class="etiqueta ok">✓ dentro</span>'
+        : `<span class="etiqueta aviso">⚠ se sale ${v.pctFuera.toFixed(0)}%</span>`;
+    }
+    for (const s of v.solapes) etiquetas += `<span class="etiqueta aviso">⚠ solapa: ${s}</span>`;
+
+    div.innerHTML = `
+      <div class="linea1">
+        <span class="punto" style="background:${z.color}"></span>
+        <span class="nombre">${etiquetaZona(z)}</span>
+        <span class="area">${formatearArea(v.area)}</span>
+      </div>
+      <div class="etiquetas">${etiquetas}</div>
+      <div class="acciones">
+        <button class="boton secundario pequeno" data-accion="vertices">${zonaEditandoVertices === z.id ? '✔ Terminar' : '✏️ Vértices'}</button>
+        <button class="boton secundario pequeno" data-accion="props">Renombrar</button>
+        <button class="boton peligro pequeno" data-accion="borrar">Borrar</button>
+      </div>`;
+
+    div.querySelector('[data-accion=vertices]').addEventListener('click', () => alternarEdicionVertices(z.id));
+    div.querySelector('[data-accion=props]').addEventListener('click', () => abrirModalZona(z.id));
+    div.querySelector('[data-accion=borrar]').addEventListener('click', () => {
+      if (confirm(`¿Borrar la zona "${z.nombre}"?`)) borrarZona(z.id);
+    });
+    div.addEventListener('mouseenter', () => z.layer.setStyle({ fillOpacity: 0.6 }));
+    div.addEventListener('mouseleave', () => z.layer.setStyle({ fillOpacity: 0.35 }));
+    cont.appendChild(div);
+  }
+}
+
+function pintarResumen() {
+  const cont = $('resumen-validacion');
+  if (!perimetroLayer || !zonas.length) { cont.textContent = ''; return; }
+  const areaPatio = turf.area(perimetroLayer.toGeoJSON());
+  const areaZonas = zonas.reduce((s, z) => s + turf.area(z.layer.toGeoJSON()), 0);
+  const problemas = zonas.map(validarZona).filter(v => !v.dentro || v.solapes.length).length;
+  cont.innerHTML = `Zonificado: <strong>${Math.min(100, (areaZonas / areaPatio) * 100).toFixed(0)}%</strong> del patio · ` +
+    (problemas ? `<span style="color:var(--aviso); font-weight:700;">${problemas} zona(s) con avisos</span>` : '<span style="color:var(--ok); font-weight:700;">todo válido ✓</span>');
+}
+
+function refrescarTodo() {
+  const hayPerimetro = !!perimetroLayer;
+  $('btn-borrar-perimetro').disabled = !hayPerimetro;
+  $('btn-dibujar-zona').disabled = !hayPerimetro;
+  $('btn-dividir').disabled = !hayPerimetro;
+  $('btn-guardar').disabled = !hayPerimetro;
+  $('btn-exportar').disabled = !hayPerimetro;
+  $('btn-modo-hoy').disabled = !hayPerimetro || !zonas.length;
+  $('dato-perimetro').innerHTML = hayPerimetro
+    ? `Área total del patio: <strong>${formatearArea(turf.area(perimetroLayer.toGeoJSON()))}</strong>`
+    : 'Sin perímetro definido.';
+  pintarListaZonas();
+  pintarResumen();
+  if (modoHoy) pintarVistaHoy();
+}
+
+/* ============================================================
+   SERIALIZACIÓN GeoJSON  (formato de guardado / exportación)
+   ============================================================ */
+function patioAGeoJSON() {
+  const features = [];
+  if (perimetroLayer) {
+    const f = perimetroLayer.toGeoJSON();
+    f.properties = { rol: 'perimetro', area_m2: Math.round(turf.area(f)) };
+    features.push(f);
+  }
+  for (const z of zonas) {
+    const f = z.layer.toGeoJSON();
+    f.properties = {
+      rol: 'zona', id: z.id, nombre: z.nombre, tipo: z.tipo, color: z.color, icono: z.icono,
+      area_m2: Math.round(turf.area(f))
+    };
+    features.push(f);
+  }
+  return { type: 'FeatureCollection', features };
+}
+
+function cargarDesdeGeoJSON(fc) {
+  // Limpiar estado actual
+  if (perimetroLayer) { mapa.removeLayer(perimetroLayer); perimetroLayer = null; }
+  borrarTodasLasZonas();
+
+  for (const f of fc.features || []) {
+    if (!f.geometry || f.geometry.type !== 'Polygon') continue;
+    const anillos = f.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
+    const p = (f.properties || {});
+    if (p.rol === 'perimetro') {
+      perimetroLayer = L.polygon(anillos, ESTILO_PERIMETRO).addTo(mapa);
+    } else {
+      const tipo = TIPOS_ZONA[p.tipo] ? p.tipo : 'otra';
+      const color = p.color || TIPOS_ZONA[tipo].color;
+      const nueva = crearZona(L.polygon(anillos, estiloZona(color)), p.nombre || 'Zona', tipo, color, p.icono);
+      // Conservar el id original para que la rotación semanal siga apuntando a la zona correcta
+      if (p.id) {
+        nueva.id = p.id;
+        const n = parseInt(String(p.id).replace(/\D/g, ''), 10);
+        if (!isNaN(n)) contadorZona = Math.max(contadorZona, n);
+      }
+    }
+  }
+  if (perimetroLayer) mapa.fitBounds(perimetroLayer.getBounds().pad(0.3));
+  refrescarTodo();
+}
+
+/* ---------- Guardar / exportar / importar ---------- */
+$('btn-guardar').addEventListener('click', async () => {
+  terminarEdicionVertices();
+  const r = await DataLayer.guardarPatio(patioAGeoJSON());
+  const e = $('estado-guardado');
+  e.className = 'ok';
+  e.id = 'estado-guardado';
+  e.textContent = '✓ Guardado ' + r.fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) +
+    ' (en este dispositivo; con Supabase se sincronizará entre equipos)';
+});
+
+$('btn-exportar').addEventListener('click', () => {
+  terminarEdicionVertices();
+  $('modal-geojson-titulo').textContent = 'GeoJSON del patio';
+  $('modal-geojson-ayuda').textContent = 'Este es el formato que se almacenará en Supabase/PostGIS (SRID 4326). Puedes copiarlo o descargarlo.';
+  $('geojson-texto').value = JSON.stringify(patioAGeoJSON(), null, 2);
+  $('geojson-texto').readOnly = true;
+  $('geojson-descargar').style.display = '';
+  $('geojson-importar').style.display = 'none';
+  $('velo-geojson').classList.add('visible');
+});
+
+$('btn-importar').addEventListener('click', () => {
+  $('modal-geojson-titulo').textContent = 'Importar GeoJSON';
+  $('modal-geojson-ayuda').textContent = 'Pega aquí un FeatureCollection exportado previamente (perímetro + zonas).';
+  $('geojson-texto').value = '';
+  $('geojson-texto').readOnly = false;
+  $('geojson-descargar').style.display = 'none';
+  $('geojson-importar').style.display = '';
+  $('velo-geojson').classList.add('visible');
+});
+
+$('geojson-cerrar').addEventListener('click', () => $('velo-geojson').classList.remove('visible'));
+
+$('geojson-descargar').addEventListener('click', () => {
+  const blob = new Blob([$('geojson-texto').value], { type: 'application/geo+json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'patio.geojson';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$('geojson-importar').addEventListener('click', () => {
+  try {
+    const fc = JSON.parse($('geojson-texto').value);
+    if (fc.type !== 'FeatureCollection') throw new Error('No es un FeatureCollection');
+    cargarDesdeGeoJSON(fc);
+    $('velo-geojson').classList.remove('visible');
+  } catch (err) {
+    avisar('GeoJSON no válido: ' + err.message);
+  }
+});
+
+/* ============================================================
+   BÚSQUEDA: directorio de centros escolares de La Rioja con
+   autocompletado (OpenStreetMap vía Overpass, descargado una vez y
+   cacheado 30 días) + Nominatim como respaldo para direcciones.
+   ============================================================ */
+const CLAVE_CENTROS = 'patios-dinamicos:centros:v1';
+let centrosRioja = null;      // [{ n: nombre, m: municipio, lat, lon }]
+let cargandoCentros = null;   // promesa de descarga en curso (evita duplicadas)
+
+function normalizarTexto(t) {
+  // minúsculas, sin tildes y sin puntos ("C.E.I.P." → "ceip")
+  return t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[.·]/g, '');
+}
+
+// Palabras de tipo de centro: no se exige que aparezcan en el nombre (en OSM
+// "IES Sagasta" figura como "Instituto Práxedes Mateo Sagasta"), solo puntúan.
+const PALABRAS_TIPO = ['ies', 'ceip', 'cra', 'cp', 'cc', 'cpc', 'eei', 'eoi', 'colegio', 'instituto', 'escuela', 'centro'];
+
+async function cargarCentrosRioja() {
+  if (centrosRioja) return centrosRioja;
+  try {
+    const cache = JSON.parse(localStorage.getItem(CLAVE_CENTROS) || 'null');
+    if (cache && Date.now() - cache.t < 30 * 864e5) return (centrosRioja = cache.lista);
+  } catch (e) { /* caché corrupta: se ignora y se vuelve a descargar */ }
+  const consulta = '[out:json][timeout:25];area["ISO3166-2"="ES-RI"]->.a;' +
+    'nwr[amenity~"^(school|college|kindergarten)$"](area.a);out center;';
+  const r = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'data=' + encodeURIComponent(consulta)
+  });
+  const j = await r.json();
+  centrosRioja = j.elements
+    .filter(e => e.tags && e.tags.name && (e.lat || e.center))
+    .map(e => ({
+      n: e.tags.name,
+      m: e.tags['addr:city'] || '',
+      lat: e.lat || e.center.lat,
+      lon: e.lon || e.center.lon
+    }));
+  localStorage.setItem(CLAVE_CENTROS, JSON.stringify({ t: Date.now(), lista: centrosRioja }));
+  return centrosRioja;
+}
+
+function asegurarCentros() {
+  if (!cargandoCentros) {
+    cargandoCentros = cargarCentrosRioja().catch(err => {
+      cargandoCentros = null; // permitir reintentar más tarde
+      throw err;
+    });
+  }
+  return cargandoCentros;
+}
+
+function buscarCentros(consulta) {
+  if (!centrosRioja) return [];
+  const tokens = normalizarTexto(consulta).split(/\s+/).filter(Boolean);
+  const obligatorios = tokens.filter(t => !PALABRAS_TIPO.includes(t));
+  if (!obligatorios.length) return []; // solo "ies" o "colegio" listaría media Rioja
+  const resultados = [];
+  for (const c of centrosRioja) {
+    const nombre = normalizarTexto(c.n + ' ' + c.m);
+    if (!obligatorios.every(t => nombre.includes(t))) continue;
+    resultados.push({ c, puntos: tokens.filter(t => nombre.includes(t)).length });
+  }
+  return resultados
+    .sort((a, b) => b.puntos - a.puntos || a.c.n.length - b.c.n.length)
+    .slice(0, 8).map(r => r.c);
+}
+
+/* --- Desplegable de sugerencias --- */
+const cajaSug = $('sugerencias-busqueda');
+let ultimaLista = [];
+let sugerenciaActiva = -1;
+let tempSug = null;
+
+function cerrarSugerencias() {
+  cajaSug.style.display = 'none';
+  cajaSug.innerHTML = '';
+  ultimaLista = [];
+  sugerenciaActiva = -1;
+}
+
+function mostrarEstadoSug(texto) {
+  cajaSug.innerHTML = `<div class="estado">${texto}</div>`;
+  cajaSug.style.display = 'block';
+  ultimaLista = [];
+  sugerenciaActiva = -1;
+}
+
+function pintarSugerencias(lista) {
+  ultimaLista = lista;
+  sugerenciaActiva = -1;
+  cajaSug.innerHTML = lista.map((c, i) =>
+    `<button class="sug" data-i="${i}">🏫 ${c.n}${c.m ? `<small>${c.m}</small>` : ''}</button>`).join('');
+  cajaSug.style.display = 'block';
+  cajaSug.querySelectorAll('.sug').forEach(b =>
+    b.addEventListener('click', () => elegirSugerencia(lista[+b.dataset.i])));
+}
+
+function marcarSugerenciaActiva() {
+  cajaSug.querySelectorAll('.sug').forEach((b, i) => b.classList.toggle('activa', i === sugerenciaActiva));
+}
+
+function elegirSugerencia(c) {
+  $('entrada-busqueda').value = c.n;
+  cerrarSugerencias();
+  irA(c.lat, c.lon, '🏫 ' + c.n);
+}
+
+$('entrada-busqueda').addEventListener('focus', () => { asegurarCentros().catch(() => {}); });
+
+$('entrada-busqueda').addEventListener('input', () => {
+  clearTimeout(tempSug);
+  if ($('entrada-busqueda').value.trim().length < 2) { cerrarSugerencias(); return; }
+  tempSug = setTimeout(async () => {
+    if (!centrosRioja) {
+      mostrarEstadoSug('Cargando el directorio de centros de La Rioja…');
+      try { await asegurarCentros(); }
+      catch (e) { mostrarEstadoSug('No se pudo descargar el directorio — busca por dirección con 🔍.'); return; }
+    }
+    const q = $('entrada-busqueda').value.trim();
+    if (q.length < 2) { cerrarSugerencias(); return; }
+    const lista = buscarCentros(q);
+    if (lista.length) pintarSugerencias(lista);
+    else mostrarEstadoSug('Ningún centro del directorio coincide — pulsa 🔍 para buscar como dirección.');
+  }, 220);
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.buscador')) cerrarSugerencias();
+});
+
+/* --- Respaldo: geocodificación de direcciones con Nominatim --- */
+async function buscarDireccion() {
+  // Con sugerencias en pantalla, buscar equivale a elegir la resaltada (o la primera)
+  if (ultimaLista.length) { elegirSugerencia(ultimaLista[Math.max(sugerenciaActiva, 0)]); return; }
+  cerrarSugerencias();
+  const q = $('entrada-busqueda').value.trim();
+  if (!q) return;
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q=' + encodeURIComponent(q);
+    const r = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+    const datos = await r.json();
+    if (!datos.length) { avisar('No se ha encontrado esa dirección. Prueba añadiendo el municipio.'); return; }
+    irA(+datos[0].lat, +datos[0].lon, datos[0].display_name);
+  } catch (err) {
+    avisar('No se pudo buscar (¿sin conexión?): ' + err.message);
+  }
+}
+
+function irA(lat, lon, texto) {
+  // Sin animación: el auto-pan del popup cancelaría el vuelo a mitad de camino
+  mapa.setView([lat, lon], 18, { animate: false });
+  if (marcadorBusqueda) mapa.removeLayer(marcadorBusqueda);
+  marcadorBusqueda = L.marker([lat, lon]).addTo(mapa);
+  if (texto) marcadorBusqueda.bindPopup(texto).openPopup();
+}
+
+$('btn-buscar').addEventListener('click', buscarDireccion);
+$('entrada-busqueda').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' && ultimaLista.length) {
+    e.preventDefault();
+    sugerenciaActiva = (sugerenciaActiva + 1) % ultimaLista.length;
+    marcarSugerenciaActiva();
+  } else if (e.key === 'ArrowUp' && ultimaLista.length) {
+    e.preventDefault();
+    sugerenciaActiva = (sugerenciaActiva - 1 + ultimaLista.length) % ultimaLista.length;
+    marcarSugerenciaActiva();
+  } else if (e.key === 'Escape') {
+    cerrarSugerencias();
+  } else if (e.key === 'Enter') {
+    buscarDireccion();
+  }
+});
+
+$('btn-geolocalizar').addEventListener('click', () => {
+  if (!navigator.geolocation) { avisar('Este navegador no permite geolocalización.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => irA(pos.coords.latitude, pos.coords.longitude, 'Tu ubicación'),
+    () => avisar('No se pudo obtener la ubicación (¿permiso denegado?).')
+  );
+});
+
+/* ============================================================
+   VISTA DE HOY (solo lectura, imprimible)
+   ============================================================ */
+async function pintarVistaHoy() {
+  const cont = $('panel-hoy');
+  const { finde } = diaLectivoHoy();
+  const hoy = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const filas = [];
+  let algunMock = false;
+  for (let i = 0; i < zonas.length; i++) {
+    const rot = await DataLayer.rotacionDeHoy(zonas[i], i);
+    if (rot.esMock) algunMock = true;
+    filas.push(rot);
+  }
+
+  let nota = '';
+  if (finde) nota += ' (fin de semana: se muestra el lunes)';
+  if (algunMock) nota += ' — actividades de ejemplo: configura la semana en 🔄 Rotación';
+  let html = `<p class="ayuda" style="margin-top:9px;"><strong style="text-transform:capitalize;">${hoy}</strong>${nota}:</p>`;
+
+  for (let i = 0; i < zonas.length; i++) {
+    const z = zonas[i], rot = filas[i];
+    html += `<div class="actividad-hoy" style="border-left-color:${z.color}">
+      <div class="zona">${etiquetaZona(z)}</div>
+      <div class="act">${rot.actividad}</div>
+      <div class="grupos">Grupo: ${rot.grupo}</div>
+    </div>`;
+    z.layer.unbindTooltip();
+    z.layer.bindTooltip(
+      `<div class="tit">${etiquetaZona(z)}</div><div class="act">${rot.actividad} · ${rot.grupo}</div>`,
+      { permanent: true, direction: 'center', className: 'etiqueta-zona' }
+    ).openTooltip();
+  }
+  cont.innerHTML = html;
+}
+
+function salirVistaHoy() {
+  for (const z of zonas) etiquetarEnMapa(z);
+  $('panel-hoy').innerHTML = '';
+}
+
+$('btn-modo-hoy').addEventListener('click', async () => {
+  modoHoy = !modoHoy;
+  terminarEdicionVertices();
+  document.body.classList.toggle('modo-hoy', modoHoy);
+  $('btn-modo-hoy').textContent = modoHoy ? '← Volver a edición' : 'Activar vista de hoy';
+  $('btn-imprimir').style.display = modoHoy ? '' : 'none';
+  if (modoHoy) { await pintarVistaHoy(); if (perimetroLayer) mapa.fitBounds(perimetroLayer.getBounds().pad(0.15)); }
+  else salirVistaHoy();
+});
+
+/* ============================================================
+   CARTEL IMPRIMIBLE (A4/A3) — esquema vectorial del patio.
+   No imprime la foto satélite: dibuja el patio como plano limpio
+   (colores planos, iconos y letra grande) pensado para primaria.
+   ============================================================ */
+const MM_PAPEL = { A4: [210, 297], A3: [297, 420] };
+
+let cartelAngulo = 0;      // grados de giro del plano dentro de la hoja
+const estiloPagina = document.createElement('style');
+document.head.appendChild(estiloPagina);
+
+// Proyección local: grados → metros respecto al centro del patio, con giro opcional
+function proyectorLocal(anguloDeg) {
+  const c = perimetroLayer.getBounds().getCenter();
+  const kx = 111320 * Math.cos(c.lat * Math.PI / 180), ky = 110540;
+  const rad = anguloDeg * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+  return ([lng, lat]) => {
+    const x = (lng - c.lng) * kx, y = -(lat - c.lat) * ky; // y hacia abajo (SVG)
+    return [x * cos - y * sin, x * sin + y * cos];
+  };
+}
+
+// Ángulo que minimiza el rectángulo envolvente del perímetro (mejor encaje en papel)
+function anguloEncajeAuto() {
+  const anillo = perimetroLayer.toGeoJSON().geometry.coordinates[0];
+  let mejor = { angulo: 0, area: Infinity, apaisado: true };
+  for (let a = 0; a < 180; a += 2) {
+    const p = proyectorLocal(a);
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (const pt of anillo) {
+      const [x, y] = p(pt);
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    const w = maxX - minX, h = maxY - minY;
+    if (w * h < mejor.area) mejor = { angulo: a, area: w * h, apaisado: w >= h };
+  }
+  return mejor;
+}
+
+// Capa base activa del mapa: el cartel usa la misma imagen de fondo
+let capaBaseActual = capaPNOA;
+mapa.on('baselayerchange', e => { capaBaseActual = e.layer; });
+
+// Mercator ↔ teselas, para incrustar la foto aérea dentro del SVG del cartel
+// (las imágenes SVG sí se imprimen; un background CSS no es fiable al imprimir)
+function tesela2lng(x, z) { return x / Math.pow(2, z) * 360 - 180; }
+function tesela2lat(y, z) {
+  const n = Math.PI - 2 * Math.PI * y / Math.pow(2, z);
+  return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+function teselasFondo(proy) {
+  const b = perimetroLayer.getBounds().pad(0.35);
+  let z = 19, x0, x1, y0, y1;
+  const calcular = () => {
+    x0 = Math.floor((b.getWest() + 180) / 360 * Math.pow(2, z));
+    x1 = Math.floor((b.getEast() + 180) / 360 * Math.pow(2, z));
+    y0 = Math.floor((1 - Math.asinh(Math.tan(b.getNorth() * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+    y1 = Math.floor((1 - Math.asinh(Math.tan(b.getSouth() * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+  };
+  calcular();
+  // Patios enormes: bajar zoom para no pedir cientos de teselas
+  while ((x1 - x0 + 1) * (y1 - y0 + 1) > 64 && z > 12) { z--; calcular(); }
+
+  let svg = '';
+  for (let x = x0; x <= x1; x++) {
+    for (let y = y0; y <= y1; y++) {
+      const url = L.Util.template(capaBaseActual._url, { z, x, y }).replace(/&/g, '&amp;');
+      const [px0, py0] = proy([tesela2lng(x, z), tesela2lat(y, z)]);
+      const [px1, py1] = proy([tesela2lng(x + 1, z), tesela2lat(y + 1, z)]);
+      svg += `<image href="${url}" x="${px0.toFixed(2)}" y="${py0.toFixed(2)}"
+        width="${(px1 - px0).toFixed(2)}" height="${(py1 - py0).toFixed(2)}" preserveAspectRatio="none"/>`;
+    }
+  }
+  return svg;
+}
+
+function generarSVGCartel(fondo) {
+  const proy = proyectorLocal(0);              // geometría sin girar (se gira el grupo entero)
+  const proyGiro = proyectorLocal(cartelAngulo); // posiciones en el espacio ya girado (bbox y etiquetas)
+  const anillos = [];   // [{ puntos, esPerimetro, zona }]
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+
+  const recoger = (coords, extra) => {
+    for (const [x, y] of coords.map(proyGiro)) {
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    anillos.push({ puntos: coords.map(proy), ...extra });
+  };
+
+  recoger(perimetroLayer.toGeoJSON().geometry.coordinates[0], { esPerimetro: true });
+  for (const z of zonas) recoger(z.layer.toGeoJSON().geometry.coordinates[0], { zona: z });
+
+  const margen = Math.max(maxX - minX, maxY - minY) * 0.07;
+  const vb = [minX - margen, minY - margen, (maxX - minX) + 2 * margen, (maxY - minY) + 2 * margen];
+  const dim = Math.max(vb[2], vb[3]);
+  const conFoto = fondo === 'foto';
+
+  let svg = `<svg viewBox="${vb.join(' ')}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Foto y polígonos van en un grupo girado en torno al centro del patio (origen local);
+  // las etiquetas se dibujan fuera del grupo para que el texto quede siempre horizontal.
+  svg += `<g transform="rotate(${cartelAngulo})">`;
+  if (conFoto) svg += teselasFondo(proy);
+
+  for (const a of anillos) {
+    const pts = a.puntos.map(p => p.map(v => v.toFixed(2)).join(',')).join(' ');
+    if (a.esPerimetro) {
+      svg += conFoto
+        ? `<polygon points="${pts}" fill="none" stroke="#ffffff" stroke-width="${dim * 0.012}"
+            stroke-dasharray="${dim * 0.03} ${dim * 0.018}" stroke-linejoin="round"/>`
+        : `<polygon points="${pts}" fill="#f1eee7" stroke="#26313b" stroke-width="${dim * 0.012}"
+            stroke-dasharray="${dim * 0.03} ${dim * 0.018}" stroke-linejoin="round"/>`;
+    } else {
+      svg += `<polygon points="${pts}" fill="${a.zona.color}" fill-opacity="${conFoto ? 0.35 : 0.5}"
+        stroke="${a.zona.color}" stroke-width="${dim * 0.009}" stroke-linejoin="round"/>`;
+    }
+  }
+  svg += `</g>`;
+
+  // Etiquetas: icono grande + nombre en el centro de cada zona (texto horizontal)
+  for (const z of zonas) {
+    const [cx, cy] = proyGiro(turf.centerOfMass(z.layer.toGeoJSON()).geometry.coordinates);
+    const fIcono = dim * 0.075, fNombre = dim * 0.032;
+    const anchoCaja = Math.max(z.nombre.length * fNombre * 0.62, z.icono ? fIcono : 0) + fNombre;
+    if (z.icono) {
+      svg += `<rect x="${cx - anchoCaja / 2}" y="${cy - fIcono * 0.55}" width="${anchoCaja}" height="${fIcono + fNombre * 1.7}"
+        rx="${fNombre}" fill="#ffffff" fill-opacity="0.88"/>`;
+      svg += `<text x="${cx}" y="${cy + fIcono * 0.25}" text-anchor="middle" font-size="${fIcono}">${z.icono}</text>`;
+      svg += `<text x="${cx}" y="${cy + fIcono * 0.55 + fNombre}" text-anchor="middle" font-size="${fNombre}"
+        font-family="Baloo 2, sans-serif" font-weight="700" fill="#26313b">${z.nombre}</text>`;
+    } else {
+      // Sin icono: solo el nombre, en caja compacta
+      svg += `<rect x="${cx - anchoCaja / 2}" y="${cy - fNombre * 1.15}" width="${anchoCaja}" height="${fNombre * 2.3}"
+        rx="${fNombre}" fill="#ffffff" fill-opacity="0.88"/>`;
+      svg += `<text x="${cx}" y="${cy + fNombre * 0.4}" text-anchor="middle" font-size="${fNombre}"
+        font-family="Baloo 2, sans-serif" font-weight="700" fill="#26313b">${z.nombre}</text>`;
+    }
+  }
+
+  // Flecha del norte (gira con el plano)
+  const nx = vb[0] + vb[2] - dim * 0.05, ny = vb[1] + dim * 0.075, r = dim * 0.032;
+  svg += `<g transform="rotate(${cartelAngulo} ${nx} ${ny})">
+    <circle cx="${nx}" cy="${ny}" r="${r}" fill="#ffffff" stroke="#26313b" stroke-width="${r * 0.09}"/>
+    <path d="M ${nx} ${ny - r * 0.62} L ${nx + r * 0.34} ${ny + r * 0.45} L ${nx} ${ny + r * 0.18} L ${nx - r * 0.34} ${ny + r * 0.45} Z" fill="#c94f2a"/>
+    <text x="${nx}" y="${ny - r * 1.25}" text-anchor="middle" font-size="${r * 0.85}" font-weight="700" fill="#26313b" font-family="Baloo 2, sans-serif">N</text>
+  </g>`;
+
+  return svg + '</svg>';
+}
+
+async function generarCartel() {
+  const formato = $('cartel-formato').value;
+  let orientacion = $('cartel-orientacion').value;
+  if (orientacion === 'auto') orientacion = anguloEncajeAuto().apaisado ? 'apaisado' : 'vertical';
+
+  const [corto, largo] = MM_PAPEL[formato];
+  const anchoMM = orientacion === 'apaisado' ? largo : corto;
+  const altoMM = orientacion === 'apaisado' ? corto : largo;
+
+  const cartel = $('cartel');
+  cartel.style.width = anchoMM + 'mm';
+  cartel.style.height = altoMM + 'mm';
+  estiloPagina.textContent = `@page { size: ${formato} ${orientacion === 'apaisado' ? 'landscape' : 'portrait'}; margin: 0; }`;
+
+  const hoy = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  const lineas = zonas.map(z => `<span style="background:${z.color}"></span>`).join('');
+
+  let leyenda = '';
+  for (let i = 0; i < zonas.length; i++) {
+    const z = zonas[i];
+    const rot = await DataLayer.rotacionDeHoy(z, i);
+    leyenda += `<div class="leyenda-item" style="border-color:${z.color}">
+      ${z.icono ? `<span class="icono">${z.icono}</span>` : ''}
+      <div class="textos">
+        <div class="nombre-z">${z.nombre}</div>
+        <div class="act-z">${rot.actividad}</div>
+        <span class="grupo-z" style="background:${z.color}">${rot.grupo}</span>
+      </div>
+    </div>`;
+  }
+
+  cartel.innerHTML = `
+    <div class="cabecera-cartel">
+      <h2>¡El patio de hoy!</h2>
+      <div class="fecha-cartel">${hoy}</div>
+      <div class="centro-cartel">CEIP Valdemontes · Patios Dinámicos La Rioja</div>
+      <div class="lineas-patio">${lineas}</div>
+    </div>
+    <div class="zona-svg">${generarSVGCartel($('cartel-fondo').value)}</div>
+    <div class="leyenda-cartel">${leyenda}</div>
+    <div class="pie-cartel">Cada grupo juega en su zona · ¡mañana rotamos! — generado el ${new Date().toLocaleDateString('es-ES')}</div>`;
+
+  // Escalar la hoja para que quepa en pantalla (al imprimir se anula el escalado)
+  const pxPorMM = 96 / 25.4;
+  const escala = Math.min(
+    (window.innerWidth - 48) / (anchoMM * pxPorMM),
+    (window.innerHeight - 140) / (altoMM * pxPorMM),
+    1
+  );
+  $('contenedor-cartel').style.transform = `scale(${escala})`;
+  $('contenedor-cartel').style.height = (altoMM * pxPorMM * escala) + 'px';
+}
+
+function abrirCartel() {
+  cartelAngulo = anguloEncajeAuto().angulo;
+  $('hoja-impresion').classList.add('visible');
+  document.body.classList.add('cartel-abierto');
+  generarCartel();
+}
+
+$('btn-imprimir').addEventListener('click', abrirCartel);
+$('cartel-cerrar').addEventListener('click', () => {
+  $('hoja-impresion').classList.remove('visible');
+  document.body.classList.remove('cartel-abierto');
+});
+$('cartel-imprimir').addEventListener('click', () => window.print());
+$('cartel-formato').addEventListener('change', generarCartel);
+$('cartel-orientacion').addEventListener('change', generarCartel);
+$('cartel-fondo').addEventListener('change', generarCartel);
+$('cartel-girar-izq').addEventListener('click', () => { cartelAngulo = (cartelAngulo - 15 + 360) % 360; generarCartel(); });
+$('cartel-girar-der').addEventListener('click', () => { cartelAngulo = (cartelAngulo + 15) % 360; generarCartel(); });
+$('cartel-girar-auto').addEventListener('click', () => { cartelAngulo = anguloEncajeAuto().angulo; $('cartel-orientacion').value = 'auto'; generarCartel(); });
+
+/* ============================================================
+   PATIO DE EJEMPLO (centro ficticio, coordenadas de un parque de Logroño)
+   ============================================================ */
+const PATIO_EJEMPLO = {
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', properties: { rol: 'perimetro' }, geometry: { type: 'Polygon', coordinates: [[
+      [-2.44860, 42.46340], [-2.44740, 42.46340], [-2.44740, 42.46260], [-2.44860, 42.46260], [-2.44860, 42.46340]
+    ]] } },
+    { type: 'Feature', properties: { rol: 'zona', nombre: 'Pista polideportiva', tipo: 'deportiva', color: '#2f9e63' }, geometry: { type: 'Polygon', coordinates: [[
+      [-2.44855, 42.46335], [-2.44800, 42.46335], [-2.44800, 42.46290], [-2.44855, 42.46290], [-2.44855, 42.46335]
+    ]] } },
+    { type: 'Feature', properties: { rol: 'zona', nombre: 'Rincón de lectura', tipo: 'lectura', color: '#3e7cb1' }, geometry: { type: 'Polygon', coordinates: [[
+      [-2.44795, 42.46335], [-2.44745, 42.46335], [-2.44745, 42.46300], [-2.44795, 42.46300], [-2.44795, 42.46335]
+    ]] } },
+    { type: 'Feature', properties: { rol: 'zona', nombre: 'Ajedrez y juegos de mesa', tipo: 'cognitiva', color: '#d99206' }, geometry: { type: 'Polygon', coordinates: [[
+      [-2.44795, 42.46295], [-2.44745, 42.46295], [-2.44745, 42.46265], [-2.44795, 42.46265], [-2.44795, 42.46295]
+    ]] } },
+    { type: 'Feature', properties: { rol: 'zona', nombre: 'Murales y tizas', tipo: 'creativa', color: '#e4572e' }, geometry: { type: 'Polygon', coordinates: [[
+      [-2.44855, 42.46285], [-2.44805, 42.46285], [-2.44805, 42.46265], [-2.44855, 42.46265], [-2.44855, 42.46285]
+    ]] } }
+  ]
+};
+
+$('btn-ejemplo').addEventListener('click', () => cargarDesdeGeoJSON(PATIO_EJEMPLO));
+
+/* ============================================================
+   EDITOR DE ROTACIÓN SEMANAL (grupos × días × zonas)
+   ============================================================ */
+let rotacionActual = null;
+
+async function pintarRotacion() {
+  const cont = $('contenido-rotacion');
+  if (!rotacionActual) {
+    rotacionActual = (await DataLayer.cargarRotacion()) || { grupos: [...GRUPOS_MOCK], dias: [{}, {}, {}, {}, {}] };
+  }
+  if (!zonas.length) {
+    cont.innerHTML = '<div class="tarjeta" style="max-width:520px;">Primero define el patio y sus zonas en <strong>🗺️ Patio y zonas</strong>.</div>';
+    return;
+  }
+  const { dia: diaHoy } = diaLectivoHoy();
+
+  let html = '<h3 style="font-family:var(--fuente-titulo); font-size:15px; margin-bottom:6px;">Grupos del centro</h3><div class="chips-grupos">';
+  rotacionActual.grupos.forEach((g, i) => {
+    html += `<span class="chip-grupo">${g}<button data-quitar-grupo="${i}" title="Quitar grupo">✕</button></span>`;
+  });
+  html += '<input id="nuevo-grupo" placeholder="ej. 5º-6º EP"><button class="boton pequeno" id="btn-anadir-grupo">＋ Añadir</button></div>';
+
+  html += '<div class="fila-botones" style="margin-bottom:12px;">' +
+    '<button class="boton secundario" id="btn-generar-rotacion">🔄 Generar rotación automática</button>' +
+    '<button class="boton" id="btn-guardar-rotacion">💾 Guardar rotación</button>' +
+    '<span id="estado-rotacion" style="font-size:12px; color:var(--tinta-suave); align-self:center;"></span></div>';
+
+  html += '<div class="envoltura-tabla"><table class="tabla-rotacion"><thead><tr><th>Zona</th>';
+  DIAS_SEMANA.forEach((d, i) => { html += `<th class="${i === diaHoy ? 'hoy' : ''}">${d}${i === diaHoy ? ' · hoy' : ''}</th>`; });
+  html += '</tr></thead><tbody>';
+  for (const z of zonas) {
+    html += `<tr><th>${etiquetaZona(z)}</th>`;
+    for (let d = 0; d < 5; d++) {
+      const celda = rotacionActual.dias[d][z.id] || {};
+      // Si la celda guarda un grupo ya eliminado, se conserva como opción para no perderlo en silencio
+      const opciones = [...new Set([...(celda.grupo ? [celda.grupo] : []), ...rotacionActual.grupos])];
+      html += `<td class="${d === diaHoy ? 'hoy' : ''}">
+        <select data-dia="${d}" data-zona="${z.id}" data-campo="grupo">
+          <option value="">— grupo —</option>
+          ${opciones.map(g => `<option ${g === celda.grupo ? 'selected' : ''}>${g}</option>`).join('')}
+        </select>
+        <input data-dia="${d}" data-zona="${z.id}" data-campo="actividad" placeholder="Actividad"
+          value="${(celda.actividad || '').replace(/"/g, '&quot;')}">
+      </td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  cont.innerHTML = html;
+
+  cont.querySelectorAll('[data-quitar-grupo]').forEach(b => b.addEventListener('click', () => {
+    rotacionActual.grupos.splice(+b.dataset.quitarGrupo, 1);
+    pintarRotacion();
+  }));
+  $('btn-anadir-grupo').addEventListener('click', () => {
+    const v = $('nuevo-grupo').value.trim();
+    if (!v) return;
+    if (!rotacionActual.grupos.includes(v)) rotacionActual.grupos.push(v);
+    pintarRotacion();
+    $('nuevo-grupo') && $('nuevo-grupo').focus();
+  });
+  $('nuevo-grupo').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-anadir-grupo').click(); });
+
+  cont.querySelectorAll('select[data-campo], input[data-campo]').forEach(el => {
+    el.addEventListener('change', () => {
+      const { dia, zona, campo } = el.dataset;
+      const c = rotacionActual.dias[dia][zona] || (rotacionActual.dias[dia][zona] = {});
+      c[campo] = el.value.trim();
+    });
+  });
+
+  $('btn-generar-rotacion').addEventListener('click', () => {
+    const gs = rotacionActual.grupos;
+    if (!gs.length) { avisar('Añade al menos un grupo antes de generar la rotación.'); return; }
+    zonas.forEach((z, i) => {
+      const lista = ACTIVIDADES_MOCK[z.tipo] || ACTIVIDADES_MOCK.otra;
+      for (let d = 0; d < 5; d++) {
+        rotacionActual.dias[d][z.id] = {
+          grupo: gs[(i + d) % gs.length],
+          actividad: lista[(i + d) % lista.length]
+        };
+      }
+    });
+    pintarRotacion();
+    avisar('Rotación generada: cada grupo pasa por todas las zonas durante la semana. Revísala y guárdala.');
+  });
+
+  $('btn-guardar-rotacion').addEventListener('click', async () => {
+    await DataLayer.guardarRotacion(rotacionActual);
+    const e = $('estado-rotacion');
+    e.textContent = '✓ Guardada — la vista de hoy y el cartel ya la usan';
+    e.style.color = 'var(--ok)';
+  });
+}
+
+/* ============================================================
+   REGISTRO RÁPIDO DE INCIDENCIAS (≤30 s, pensado para el móvil)
+   ============================================================ */
+const TIPOS_INCIDENCIA = {
+  conflicto: { etiqueta: 'Conflicto', icono: '⚡' },
+  exclusion: { etiqueta: 'Exclusión', icono: '😔' },
+  otro:      { etiqueta: 'Otro',      icono: '❓' }
+};
+const GRAVEDADES = { 1: 'Leve', 2: 'Media', 3: 'Alta' };
+const COLOR_GRAVEDAD = { 1: 'var(--ok)', 2: 'var(--z-cognitiva)', 3: 'var(--aviso)' };
+const FRANJAS = { recreo: '☀️ Recreo', comedor: '🍽️ Comedor', entradas: '🚪 Entradas/salidas', otra: '🕐 Otro momento' };
+
+// Preselección de franja según la hora del reloj (el profe solo la cambia si no cuadra)
+function franjaPorHora(d = new Date()) {
+  const h = d.getHours() + d.getMinutes() / 60;
+  if (h >= 13.5 && h < 15.5) return 'comedor';
+  if (h < 9.5 || h >= 16.5) return 'entradas';
+  return 'recreo';
+}
+
+let incSel = {};
+
+function fechaISOLocal(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Mini-plano del patio con zonas pulsables (misma proyección que el cartel)
+function svgSelectorZona() {
+  const proy = proyectorLocal(0);
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  const medir = coords => {
+    for (const [x, y] of coords.map(proy)) {
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+  };
+  medir(perimetroLayer.toGeoJSON().geometry.coordinates[0]);
+  zonas.forEach(z => medir(z.layer.toGeoJSON().geometry.coordinates[0]));
+  const margen = Math.max(maxX - minX, maxY - minY) * 0.05;
+  const vb = [minX - margen, minY - margen, (maxX - minX) + 2 * margen, (maxY - minY) + 2 * margen];
+  const dim = Math.max(vb[2], vb[3]);
+
+  let svg = `<svg viewBox="${vb.join(' ')}" xmlns="http://www.w3.org/2000/svg">`;
+  const perPts = perimetroLayer.toGeoJSON().geometry.coordinates[0].map(proy)
+    .map(p => p.map(v => v.toFixed(2)).join(',')).join(' ');
+  svg += `<polygon points="${perPts}" fill="#f1eee7" stroke="#26313b" stroke-width="${dim * 0.01}"
+    stroke-dasharray="${dim * 0.025} ${dim * 0.015}" stroke-linejoin="round"/>`;
+  for (const z of zonas) {
+    const pts = z.layer.toGeoJSON().geometry.coordinates[0].map(proy)
+      .map(p => p.map(v => v.toFixed(2)).join(',')).join(' ');
+    svg += `<polygon points="${pts}" data-zona-sel="${z.id}" fill="${z.color}" fill-opacity="0.4"
+      stroke="${z.color}" stroke-width="${dim * 0.007}" stroke-linejoin="round"/>`;
+    const [cx, cy] = proy(turf.centerOfMass(z.layer.toGeoJSON()).geometry.coordinates);
+    svg += `<text x="${cx}" y="${cy}" text-anchor="middle" font-size="${dim * 0.055}"
+      style="pointer-events:none;">${z.icono || ''}</text>`;
+  }
+  return svg + '</svg>';
+}
+
+async function pintarIncidencias() {
+  const cont = $('contenido-incidencias');
+  if (!perimetroLayer || !zonas.length) {
+    cont.innerHTML = '<div class="tarjeta" style="max-width:520px;">Primero define el patio y sus zonas en <strong>🗺️ Patio y zonas</strong>.</div>';
+    return;
+  }
+  incSel = { zonaId: undefined, zonaNombre: '', tipo: null, curso: null, gravedad: null, franja: franjaPorHora() };
+  const rot = await DataLayer.cargarRotacion();
+  const grupos = (rot && rot.grupos && rot.grupos.length) ? rot.grupos : [...GRUPOS_MOCK];
+
+  const botonesTipo = Object.entries(TIPOS_INCIDENCIA).map(([clave, t]) =>
+    `<button data-tipo-inc="${clave}"><span class="ic">${t.icono}</span>${t.etiqueta}</button>`).join('');
+  const chipsCurso = grupos.map(g => `<button data-curso="${g}">${g}</button>`).join('');
+  const botonesGrav = Object.entries(GRAVEDADES).map(([n, etq]) =>
+    `<button data-gravedad="${n}" class="grav-${n}">${etq}</button>`).join('');
+
+  cont.innerHTML = `
+    <div class="form-incidencia">
+      <div>
+        <div class="paso-titulo"><span class="paso">1</span> ¿Dónde? Toca la zona</div>
+        <div id="svg-selector-zona">${svgSelectorZona()}</div>
+        <div class="chips-curso" style="margin-top:8px;"><button id="btn-sin-zona">📍 Otro lugar del patio</button></div>
+      </div>
+      <div>
+        <div class="paso-titulo"><span class="paso">2</span> ¿Qué ha pasado?</div>
+        <div class="botonera-grande" id="botones-tipo">${botonesTipo}</div>
+      </div>
+      <div>
+        <div class="paso-titulo"><span class="paso">3</span> ¿Qué curso? (siempre agregado)</div>
+        <div class="chips-curso" id="chips-curso">${chipsCurso}</div>
+      </div>
+      <div>
+        <div class="paso-titulo"><span class="paso">4</span> Gravedad</div>
+        <div class="botonera-grande" id="botones-gravedad">${botonesGrav}</div>
+      </div>
+      <div>
+        <div class="paso-titulo"><span class="paso">5</span> ¿En qué momento? <small style="font-weight:400; color:var(--tinta-suave);">(preseleccionado por la hora)</small></div>
+        <div class="chips-curso" id="chips-franja">${Object.entries(FRANJAS).map(([k, etq]) =>
+          `<button data-franja="${k}" class="${k === incSel.franja ? 'elegido' : ''}">${etq}</button>`).join('')}</div>
+      </div>
+      <input type="text" id="inc-nota" maxlength="140" placeholder="Nota breve (opcional, sin nombres propios)">
+      <button class="boton" id="btn-registrar-incidencia">✅ Registrar incidencia</button>
+    </div>
+    <div class="lista-incidencias" id="lista-incidencias"></div>`;
+
+  // Selección de zona en el mini-plano
+  const marcarZona = id => {
+    incSel.zonaId = id;
+    const z = zonas.find(x => x.id === id);
+    incSel.zonaNombre = z ? z.nombre : 'Otro lugar del patio';
+    cont.querySelectorAll('[data-zona-sel]').forEach(p => {
+      const activa = p.dataset.zonaSel === id;
+      p.setAttribute('fill-opacity', activa ? '0.8' : '0.4');
+      p.setAttribute('stroke', activa ? '#26313b' : zonas.find(x => x.id === p.dataset.zonaSel).color);
+    });
+    $('btn-sin-zona').classList.toggle('elegido', id === 'fuera');
+  };
+  cont.querySelectorAll('[data-zona-sel]').forEach(p =>
+    p.addEventListener('click', () => marcarZona(p.dataset.zonaSel)));
+  $('btn-sin-zona').addEventListener('click', () => marcarZona('fuera'));
+
+  const seleccionSimple = (selector, campo) => {
+    cont.querySelectorAll(selector).forEach(b => b.addEventListener('click', () => {
+      cont.querySelectorAll(selector).forEach(x => x.classList.remove('elegido'));
+      b.classList.add('elegido');
+      incSel[campo] = b.dataset[campo === 'gravedad' ? 'gravedad' : campo === 'curso' ? 'curso' : 'tipoInc'];
+    }));
+  };
+  seleccionSimple('[data-tipo-inc]', 'tipo');
+  seleccionSimple('[data-curso]', 'curso');
+  seleccionSimple('[data-gravedad]', 'gravedad');
+
+  cont.querySelectorAll('[data-franja]').forEach(b => b.addEventListener('click', () => {
+    cont.querySelectorAll('[data-franja]').forEach(x => x.classList.remove('elegido'));
+    b.classList.add('elegido');
+    incSel.franja = b.dataset.franja;
+  }));
+
+  $('btn-registrar-incidencia').addEventListener('click', async () => {
+    if (incSel.zonaId === undefined) { avisar('Falta la zona: toca el plano (o "Otro lugar").'); return; }
+    if (!incSel.tipo) { avisar('Falta el tipo de incidencia.'); return; }
+    if (!incSel.curso) { avisar('Falta el curso (agregado).'); return; }
+    if (!incSel.gravedad) { avisar('Falta la gravedad.'); return; }
+    const ahora = new Date();
+    await DataLayer.guardarIncidencia({
+      fecha: fechaISOLocal(ahora),
+      hora: ahora.toTimeString().slice(0, 5),
+      zonaId: incSel.zonaId === 'fuera' ? null : incSel.zonaId,
+      zonaNombre: incSel.zonaNombre,
+      tipo: incSel.tipo,
+      curso: incSel.curso,
+      gravedad: +incSel.gravedad,
+      franja: incSel.franja,
+      nota: $('inc-nota').value.trim()
+    });
+    avisar('✓ Incidencia registrada. ¡Gracias!');
+    pintarIncidencias(); // formulario limpio para la siguiente
+  });
+
+  pintarListaIncidencias();
+}
+
+async function pintarListaIncidencias() {
+  const cont = $('lista-incidencias');
+  const hoy = await DataLayer.listarIncidencias(fechaISOLocal());
+  if (!hoy.length) { cont.innerHTML = ''; return; }
+  let html = `<div class="paso-titulo" style="font-family:var(--fuente-titulo);">Registradas hoy: ${hoy.length}</div>`;
+  for (const inc of [...hoy].reverse()) {
+    const t = TIPOS_INCIDENCIA[inc.tipo] || TIPOS_INCIDENCIA.otro;
+    html += `<div class="inc-item" style="border-left-color:${COLOR_GRAVEDAD[inc.gravedad]}">
+      <span class="hora">${inc.hora}</span>
+      <div class="detalle"><strong>${t.icono} ${t.etiqueta}</strong> · ${inc.zonaNombre} · ${inc.curso} · ${GRAVEDADES[inc.gravedad]}${inc.franja && FRANJAS[inc.franja] ? ' · ' + FRANJAS[inc.franja] : ''}${inc.nota ? '<br>' + inc.nota : ''}</div>
+      <button data-borrar-inc="${inc.id}" title="Borrar registro">✕</button>
+    </div>`;
+  }
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-borrar-inc]').forEach(b => b.addEventListener('click', async () => {
+    await DataLayer.borrarIncidencia(b.dataset.borrarInc);
+    avisar('Registro borrado.');
+    pintarListaIncidencias();
+  }));
+}
+
+/* ============================================================
+   RECUENTO RÁPIDO DE OCUPACIÓN (un toque por zona, desde la guardia)
+   ============================================================ */
+const NIVELES_OCUPACION = { 0: 'Vacía', 1: 'Poca', 2: 'Media', 3: 'Llena' };
+const ICONO_NIVEL = { 0: '○', 1: '◔', 2: '◑', 3: '●' };
+
+let ocupSel = {};
+
+async function pintarOcupacion() {
+  const cont = $('contenido-ocupacion');
+  if (!perimetroLayer || !zonas.length) {
+    cont.innerHTML = '<div class="tarjeta" style="max-width:520px;">Primero define el patio y sus zonas en <strong>🗺️ Patio y zonas</strong>.</div>';
+    return;
+  }
+  ocupSel = {};
+
+  const filas = zonas.map(z => `
+    <div class="fila-ocupacion">
+      <span class="etiq"><span class="punto" style="background:${z.color}"></span>${z.icono ? z.icono + ' ' : ''}${z.nombre}</span>
+      <div class="niveles" data-zona="${z.id}">
+        ${Object.entries(NIVELES_OCUPACION).map(([n, etq]) =>
+          `<button data-nivel="${n}"><span class="circulo">${ICONO_NIVEL[n]}</span>${etq}</button>`).join('')}
+      </div>
+    </div>`).join('');
+
+  cont.innerHTML = `
+    <div class="form-ocupacion">
+      <div class="paso-titulo" style="font-family:var(--fuente-titulo);"><span class="paso">1</span> ¿Cómo está cada zona ahora mismo?</div>
+      ${filas}
+      <button class="boton" id="btn-guardar-ocupacion">✅ Guardar recuento</button>
+    </div>
+    <div class="lista-incidencias" id="lista-ocupaciones"></div>`;
+
+  cont.querySelectorAll('.niveles button').forEach(b => b.addEventListener('click', () => {
+    b.parentElement.querySelectorAll('button').forEach(x => x.classList.remove('elegido'));
+    b.classList.add('elegido');
+    ocupSel[b.parentElement.dataset.zona] = +b.dataset.nivel;
+  }));
+
+  $('btn-guardar-ocupacion').addEventListener('click', async () => {
+    if (!Object.keys(ocupSel).length) { avisar('Marca el nivel de al menos una zona.'); return; }
+    const ahora = new Date();
+    await DataLayer.guardarOcupacion({
+      fecha: fechaISOLocal(ahora),
+      hora: ahora.toTimeString().slice(0, 5),
+      niveles: { ...ocupSel }
+    });
+    avisar('✓ Recuento guardado. ¡Gracias!');
+    pintarOcupacion(); // formulario limpio para el siguiente recuento
+  });
+
+  pintarListaOcupaciones();
+}
+
+async function pintarListaOcupaciones() {
+  const cont = $('lista-ocupaciones');
+  const hoy = await DataLayer.listarOcupaciones(fechaISOLocal());
+  if (!hoy.length) { cont.innerHTML = ''; return; }
+  let html = `<div class="paso-titulo" style="font-family:var(--fuente-titulo);">Recuentos de hoy: ${hoy.length}</div>`;
+  for (const reg of [...hoy].reverse()) {
+    const partes = Object.entries(reg.niveles).map(([zid, n]) => {
+      const z = zonas.find(x => x.id === zid);
+      return `${z ? z.nombre : '(zona eliminada)'}: <strong>${NIVELES_OCUPACION[n]}</strong>`;
+    }).join(' · ');
+    html += `<div class="inc-item" style="border-left-color:#3e7cb1">
+      <span class="hora">${reg.hora}</span>
+      <div class="detalle">${partes}</div>
+      <button data-borrar-ocup="${reg.id}" title="Borrar recuento">✕</button>
+    </div>`;
+  }
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-borrar-ocup]').forEach(b => b.addEventListener('click', async () => {
+    await DataLayer.borrarOcupacion(b.dataset.borrarOcup);
+    avisar('Recuento borrado.');
+    pintarListaOcupaciones();
+  }));
+}
+
+/* ============================================================
+   ENCUESTA TRIMESTRAL DE BIENESTAR (alumnado / profesorado)
+   ============================================================ */
+const ITEMS_ENCUESTA = {
+  alumnado: [
+    '¿Te lo pasas bien en el recreo?',
+    '¿Tienes con quién jugar?',
+    '¿Te gustan las actividades de las zonas?',
+    '¿Te sientes tranquilo/a y seguro/a en el patio?',
+    'Si hay un problema, ¿te ayudan los profes?'
+  ],
+  profesorado: [
+    'El clima de convivencia durante el recreo es bueno.',
+    'Las zonas y la rotación reducen los conflictos.',
+    'La participación del alumnado en las actividades es alta.',
+    'El alumnado que solía quedar excluido participa más.',
+    'La organización de la rotación es clara y fácil de aplicar.',
+    'La carga para el profesorado de guardia es asumible.'
+  ]
+};
+const ESCALA_LIKERT = ['😞', '🙁', '😐', '🙂', '😄'];
+
+let encSel = {};
+
+function trimestreActual(d = new Date()) {
+  const m = d.getMonth() + 1;
+  return m >= 9 ? 'T1' : m <= 3 ? 'T2' : 'T3';
+}
+
+async function pintarEncuestas() {
+  const cont = $('contenido-encuestas');
+  encSel = { respondente: encSel.respondente || 'alumnado', curso: null, respuestas: {} };
+  const rot = await DataLayer.cargarRotacion();
+  const grupos = (rot && rot.grupos && rot.grupos.length) ? rot.grupos : [...GRUPOS_MOCK];
+  const esAlumnado = encSel.respondente === 'alumnado';
+  const items = ITEMS_ENCUESTA[encSel.respondente];
+
+  let html = `<div class="form-encuesta">
+    <div class="pestanas-respondente">
+      <button data-respondente="alumnado" class="${esAlumnado ? 'elegido' : ''}">🧒 Alumnado</button>
+      <button data-respondente="profesorado" class="${esAlumnado ? '' : 'elegido'}">🧑‍🏫 Profesorado</button>
+    </div>`;
+
+  if (esAlumnado) {
+    html += `<div>
+      <div class="paso-titulo"><span class="paso">1</span> ¿De qué curso eres?</div>
+      <div class="chips-curso" id="chips-curso-enc">${grupos.map(g => `<button data-curso-enc="${g}">${g}</button>`).join('')}</div>
+    </div>`;
+  }
+
+  html += `<div><div class="paso-titulo"><span class="paso">${esAlumnado ? 2 : 1}</span> ${esAlumnado ? 'Marca la carita que más se parezca a ti' : 'Indica tu grado de acuerdo (1 = nada · 5 = totalmente)'}</div>`;
+  items.forEach((pregunta, i) => {
+    html += `<div class="item-encuesta">
+      <div class="pregunta">${pregunta}</div>
+      <div class="escala-likert">${ESCALA_LIKERT.map((cara, v) =>
+        `<button data-item="${i}" data-valor="${v + 1}" title="${v + 1} de 5">${cara}</button>`).join('')}</div>
+    </div>`;
+  });
+  html += `</div>
+    <input type="text" id="enc-comentario" maxlength="200" placeholder="Comentario opcional (sin nombres propios)">
+    <button class="boton" id="btn-enviar-encuesta" style="padding:13px; font-size:15px; border-radius:12px;">📨 Enviar respuesta anónima</button>
+  </div>
+  <div class="resumen-encuestas" id="resumen-encuestas"></div>`;
+
+  cont.innerHTML = html;
+
+  cont.querySelectorAll('[data-respondente]').forEach(b => b.addEventListener('click', () => {
+    encSel.respondente = b.dataset.respondente;
+    pintarEncuestas();
+  }));
+  cont.querySelectorAll('[data-curso-enc]').forEach(b => b.addEventListener('click', () => {
+    cont.querySelectorAll('[data-curso-enc]').forEach(x => x.classList.remove('elegido'));
+    b.classList.add('elegido');
+    encSel.curso = b.dataset.cursoEnc;
+  }));
+  cont.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => {
+    cont.querySelectorAll(`[data-item="${b.dataset.item}"]`).forEach(x => x.classList.remove('elegido'));
+    b.classList.add('elegido');
+    encSel.respuestas[b.dataset.item] = +b.dataset.valor;
+  }));
+
+  $('btn-enviar-encuesta').addEventListener('click', async () => {
+    if (esAlumnado && !encSel.curso) { avisar('Falta el curso.'); return; }
+    const valores = items.map((_, i) => encSel.respuestas[i]);
+    const sinResponder = valores.findIndex(v => !v);
+    if (sinResponder !== -1) { avisar(`Falta responder la pregunta ${sinResponder + 1}.`); return; }
+    const media = valores.reduce((s, v) => s + v, 0) / valores.length;
+    await DataLayer.guardarEncuesta({
+      fecha: fechaISOLocal(),
+      trimestre: trimestreActual(),
+      tipoRespondente: encSel.respondente,
+      curso: esAlumnado ? encSel.curso : 'claustro',
+      puntuacion: Math.round(media * 10) / 10,
+      respuestas: valores,
+      comentario: $('enc-comentario').value.trim()
+    });
+    avisar('✓ ¡Gracias! Respuesta anónima enviada.');
+    pintarEncuestas(); // formulario limpio para la siguiente persona
+  });
+
+  pintarResumenEncuestas();
+}
+
+async function pintarResumenEncuestas() {
+  const cont = $('resumen-encuestas');
+  const todas = await DataLayer.listarEncuestas();
+  const tri = trimestreActual();
+  const deEsteTri = todas.filter(e => e.trimestre === tri);
+  if (!deEsteTri.length) { cont.innerHTML = ''; return; }
+  let html = '';
+  for (const tipo of ['alumnado', 'profesorado']) {
+    const del = deEsteTri.filter(e => e.tipoRespondente === tipo);
+    if (!del.length) continue;
+    const media = del.reduce((s, e) => s + e.puntuacion, 0) / del.length;
+    html += `<div class="tarjeta"><h4 style="font-family:var(--fuente-titulo); font-size:13px; margin-bottom:4px;">${tipo === 'alumnado' ? '🧒 Alumnado' : '🧑‍🏫 Profesorado'} · ${tri}</h4>
+      <div class="mock-dato">${(Math.round(media * 10) / 10).toLocaleString('es-ES')}/5 <small>${del.length} respuesta${del.length === 1 ? '' : 's'}</small></div></div>`;
+  }
+  cont.innerHTML = html;
+}
+
+/* ============================================================
+   PANEL DEL CENTRO (KPIs + gráficos con los datos reales)
+   ============================================================ */
+function fechaHaceDias(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return fechaISOLocal(d);
+}
+
+async function pintarPanelCentro() {
+  const cont = $('contenido-panel');
+  const incs = await DataLayer.listarIncidencias();
+  const encs = await DataLayer.listarEncuestas();
+  const ocups = await DataLayer.listarOcupaciones();
+
+  if (!incs.length && !encs.length && !ocups.length) {
+    cont.innerHTML = `<div class="tarjeta" style="max-width:520px;">Aún no hay datos.
+      Registra incidencias en <strong>📝 Incidencias</strong>, haz recuentos en
+      <strong>🙌 Ocupación</strong> y pasa la encuesta en
+      <strong>💬 Encuestas</strong>: este panel se irá llenando solo.</div>`;
+    return;
+  }
+
+  const hoy = fechaISOLocal();
+  const enVentana = (desde, hasta) => incs.filter(i => i.fecha >= desde && i.fecha <= hasta).length;
+  const incHoy = incs.filter(i => i.fecha === hoy).length;
+  const ult7 = enVentana(fechaHaceDias(6), hoy);
+  const prev7 = enVentana(fechaHaceDias(13), fechaHaceDias(7));
+
+  /* ---- KPIs ---- */
+  let kpis = `<div class="tile-dato"><div class="etiq">Incidencias hoy</div><div class="valor">${incHoy}</div></div>`;
+
+  let deltaHtml = '';
+  if (prev7 > 0 || ult7 > 0) {
+    const dif = ult7 - prev7;
+    // Subir incidencias es malo: rojo al subir, verde al bajar
+    if (dif !== 0) deltaHtml = `<div class="delta ${dif > 0 ? 'malo' : 'bueno'}">${dif > 0 ? '▲ +' : '▼ '}${dif} vs 7 días previos</div>`;
+    else deltaHtml = '<div class="delta">= igual que los 7 días previos</div>';
+  }
+  kpis += `<div class="tile-dato"><div class="etiq">Incidencias últimos 7 días</div><div class="valor">${ult7}</div>${deltaHtml}</div>`;
+
+  const tri = trimestreActual();
+  for (const tipo of ['alumnado', 'profesorado']) {
+    const del = encs.filter(e => e.trimestre === tri && e.tipoRespondente === tipo);
+    if (!del.length) continue;
+    const media = del.reduce((s, e) => s + e.puntuacion, 0) / del.length;
+    kpis += `<div class="tile-dato"><div class="etiq">Bienestar ${tipo} · ${tri}</div>
+      <div class="valor">${(Math.round(media * 10) / 10).toLocaleString('es-ES')}<small> /5 · ${del.length} resp.</small></div></div>`;
+  }
+
+  /* ---- Ocupación: ventana de 7 días (o todo si no hay recuentos recientes) ---- */
+  const ocup7 = ocups.filter(o => o.fecha >= fechaHaceDias(6));
+  const ventanaOcup = ocup7.length ? ocup7 : ocups;
+  const etiquetaVentana = ocup7.length ? 'últimos 7 días' : 'todos los recuentos';
+  if (ventanaOcup.length) {
+    let suma = 0, n = 0;
+    ventanaOcup.forEach(o => Object.values(o.niveles).forEach(v => { suma += v; n++; }));
+    const pct = Math.round(suma / (3 * n) * 100);
+    kpis += `<div class="tile-dato"><div class="etiq">Ocupación media · ${etiquetaVentana}</div>
+      <div class="valor">${pct} %<small> · ${ventanaOcup.length} recuento${ventanaOcup.length === 1 ? '' : 's'}</small></div></div>`;
+  }
+
+  /* ---- Incidencias por zona (barras horizontales, una tinta) ---- */
+  const porZona = {};
+  incs.forEach(i => { porZona[i.zonaNombre] = (porZona[i.zonaNombre] || 0) + 1; });
+  const zonasOrden = Object.entries(porZona).sort((a, b) => b[1] - a[1]);
+  const maxZona = Math.max(...zonasOrden.map(z => z[1]), 1);
+  let barras = '', tablaZonas = '';
+  for (const [nombre, n] of zonasOrden) {
+    const z = zonas.find(x => x.nombre === nombre);
+    barras += `<div class="fila-barra" title="${nombre}: ${n} incidencia${n === 1 ? '' : 's'}">
+      <span class="etiq"><span class="punto" style="background:${z ? z.color : 'var(--tinta-suave)'}"></span>${nombre}</span>
+      <span class="pista"><span class="barra" style="width:${(n / maxZona) * 100}%"></span></span>
+      <span class="num">${n}</span></div>`;
+    tablaZonas += `<tr><td>${nombre}</td><td>${n}</td></tr>`;
+  }
+
+  /* ---- Incidencias por día (14 días, columnas; hoy enfatizado) ---- */
+  const dias = [...Array(14)].map((_, k) => fechaHaceDias(13 - k));
+  const porDia = dias.map(f => incs.filter(i => i.fecha === f).length);
+  const maxDia = Math.max(...porDia, 1);
+  const letrasDia = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+  let cols = '', pieDias = '', tablaDias = '';
+  dias.forEach((f, k) => {
+    const n = porDia[k], esHoy = f === hoy;
+    cols += `<div class="col ${esHoy ? 'hoy' : ''}" title="${f}: ${n}">
+      ${n && (esHoy || n === maxDia) ? `<span class="cima">${n}</span>` : ''}
+      <span class="caja" style="height:${(n / maxDia) * 88}%"></span></div>`;
+    pieDias += `<span class="${esHoy ? 'hoy' : ''}">${letrasDia[new Date(f + 'T12:00').getDay()]}${esHoy ? '·hoy' : ''}</span>`;
+    if (n) tablaDias += `<tr><td>${f}</td><td>${n}</td></tr>`;
+  });
+
+  /* ---- Ocupación media por zona (barras horizontales, % de "llena") ---- */
+  const porZonaOcup = {};
+  ventanaOcup.forEach(o => Object.entries(o.niveles).forEach(([zid, v]) => {
+    const acc = porZonaOcup[zid] || (porZonaOcup[zid] = { suma: 0, n: 0 });
+    acc.suma += v; acc.n++;
+  }));
+  const zonasOcup = Object.entries(porZonaOcup)
+    .map(([zid, acc]) => {
+      const z = zonas.find(x => x.id === zid);
+      return { nombre: z ? z.nombre : '(zona eliminada)', color: z ? z.color : 'var(--tinta-suave)', pct: Math.round(acc.suma / (3 * acc.n) * 100), n: acc.n };
+    })
+    .sort((a, b) => b.pct - a.pct);
+  let barrasOcup = '', tablaOcup = '';
+  for (const zo of zonasOcup) {
+    barrasOcup += `<div class="fila-barra" title="${zo.nombre}: ocupación media ${zo.pct} % (${zo.n} recuento${zo.n === 1 ? '' : 's'})">
+      <span class="etiq"><span class="punto" style="background:${zo.color}"></span>${zo.nombre}</span>
+      <span class="pista"><span class="barra" style="width:${zo.pct}%"></span></span>
+      <span class="num">${zo.pct}%</span></div>`;
+    tablaOcup += `<tr><td>${zo.nombre}</td><td>${zo.pct} %</td><td>${zo.n}</td></tr>`;
+  }
+
+  /* ---- Tipo y gravedad ---- */
+  const porTipo = {};
+  incs.forEach(i => { porTipo[i.tipo] = (porTipo[i.tipo] || 0) + 1; });
+  const maxTipo = Math.max(...Object.values(porTipo), 1);
+  let barrasTipo = '';
+  for (const [clave, t] of Object.entries(TIPOS_INCIDENCIA)) {
+    const n = porTipo[clave] || 0;
+    if (!n) continue;
+    barrasTipo += `<div class="fila-barra" title="${t.etiqueta}: ${n}">
+      <span class="etiq">${t.icono} ${t.etiqueta}</span>
+      <span class="pista"><span class="barra" style="width:${(n / maxTipo) * 100}%"></span></span>
+      <span class="num">${n}</span></div>`;
+  }
+  let chipsGrav = '';
+  for (const [g, etq] of Object.entries(GRAVEDADES)) {
+    const n = incs.filter(i => i.gravedad === +g).length;
+    chipsGrav += `<span class="chip-gravedad"><span class="cuadro" style="background:${COLOR_GRAVEDAD[g]}"></span>${etq}: <strong>${n}</strong></span>`;
+  }
+
+  cont.innerHTML = `
+    <div class="panel-kpis">${kpis}</div>
+    <div class="rejilla-graficos">
+      <div class="grafico-tarjeta">
+        <h4>Incidencias por zona (total)</h4>
+        ${barras || '<p style="font-size:12.5px; color:var(--tinta-suave);">Sin incidencias registradas.</p>'}
+        <details><summary>Ver como tabla</summary><table><tr><th>Zona</th><th>Incidencias</th></tr>${tablaZonas}</table></details>
+      </div>
+      <div class="grafico-tarjeta">
+        <h4>Incidencias por día (últimos 14 días)</h4>
+        <div class="cols-dias">${cols}</div>
+        <div class="pie-dias">${pieDias}</div>
+        <details><summary>Ver como tabla</summary><table><tr><th>Fecha</th><th>Incidencias</th></tr>${tablaDias || '<tr><td colspan=2>Sin registros</td></tr>'}</table></details>
+      </div>
+      <div class="grafico-tarjeta">
+        <h4>Ocupación media por zona (${etiquetaVentana})</h4>
+        ${barrasOcup
+          ? barrasOcup + `<details><summary>Ver como tabla</summary><table><tr><th>Zona</th><th>Ocupación</th><th>Recuentos</th></tr>${tablaOcup}</table></details>`
+          : '<p style="font-size:12.5px; color:var(--tinta-suave);">Sin recuentos aún — regístralos en <strong>🙌 Ocupación</strong> durante la guardia.</p>'}
+      </div>
+      <div class="grafico-tarjeta">
+        <h4>Por tipo</h4>
+        ${barrasTipo || '<p style="font-size:12.5px; color:var(--tinta-suave);">Sin incidencias registradas.</p>'}
+      </div>
+      <div class="grafico-tarjeta">
+        <h4>Por gravedad</h4>
+        <div class="chips-gravedad">${chipsGrav}</div>
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+   PANEL REGIONAL — DEMOSTRACIÓN
+   DATOS FICTICIOS: tres centros inventados con series inventadas,
+   solo para enseñar el concepto. Con Supabase, esto se sustituye por
+   vistas SQL agregadas (nunca tablas base) bajo el rol investigador.
+   Paleta categórica de 3 series validada (CVD ΔE adyacente 24,2):
+   azul #2a78d6 · aqua #1baf7a · ámbar #eda100, orden fijo.
+   ============================================================ */
+const MESES_CURSO = ['Sep', 'Oct', 'Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
+
+const CENTROS_DEMO = [
+  {
+    id: 'c1', nombre: 'CEIP Valdemontes', anonimo: 'Centro A',
+    tipo: 'colegio', etapa: 'EP', ruralidad: 'urbano', alumnos: 450, color: '#2a78d6',
+    incidencias100: [8.2, 7.6, 7.1, 6.4, 6.0, 5.5, 5.1, 4.9, 4.4, 4.2],
+    participacion:  [62, 68, 71, 75, 78, 80, 83, 84, 86, 87],
+    bienestar: { T1: 3.4, T2: 3.8, T3: 4.1 }
+  },
+  {
+    id: 'c2', nombre: 'IES Cierzo Alto', anonimo: 'Centro B',
+    tipo: 'instituto', etapa: 'ESO', ruralidad: 'urbano', alumnos: 620, color: '#1baf7a',
+    incidencias100: [6.5, 6.7, 6.1, 5.9, 5.6, 5.8, 5.2, 5.0, 4.8, 4.6],
+    participacion:  [48, 52, 55, 58, 61, 63, 66, 69, 70, 72],
+    bienestar: { T1: 3.1, T2: 3.4, T3: 3.6 }
+  },
+  {
+    id: 'c3', nombre: 'CRA Los Sotos', anonimo: 'Centro C',
+    tipo: 'colegio', etapa: 'EP', ruralidad: 'rural', alumnos: 85, color: '#eda100',
+    incidencias100: [4.1, 3.8, 4.0, 3.5, 3.2, 3.0, 2.9, 2.6, 2.4, 2.4],
+    participacion:  [70, 74, 76, 79, 83, 85, 88, 90, 91, 93],
+    bienestar: { T1: 3.7, T2: 4.0, T3: 4.3 }
+  }
+];
+
+let regFiltros = { etapa: 'todas', ruralidad: 'todas', tamano: 'todos' };
+let regNombresVisibles = false;
+
+function etiquetaCentro(c) {
+  return regNombresVisibles ? c.nombre : `${c.anonimo} (${c.tipo} ${c.ruralidad})`;
+}
+
+function centrosFiltrados() {
+  return CENTROS_DEMO.filter(c =>
+    (regFiltros.etapa === 'todas' || c.etapa === regFiltros.etapa) &&
+    (regFiltros.ruralidad === 'todas' || c.ruralidad === regFiltros.ruralidad) &&
+    (regFiltros.tamano === 'todos' ||
+      (regFiltros.tamano === 'pequeno' && c.alumnos < 150) ||
+      (regFiltros.tamano === 'medio' && c.alumnos >= 150 && c.alumnos <= 500) ||
+      (regFiltros.tamano === 'grande' && c.alumnos > 500))
+  );
+}
+
+// Gráfico de líneas SVG: series por centro (2px, punto final con anillo, etiqueta al final)
+function graficoLineasRegional(centros, campo, maxY, decimales) {
+  const W = 560, H = 200, mIzq = 34, mDer = 60, mSup = 12, mInf = 26;
+  const anchoTrazado = W - mIzq - mDer, altoTrazado = H - mSup - mInf;
+  const n = MESES_CURSO.length;
+  const x = i => mIzq + (i / (n - 1)) * anchoTrazado;
+  const y = v => mSup + (1 - v / maxY) * altoTrazado;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img">`;
+  // Rejilla recesiva: 3 líneas horizontales + etiquetas de eje en tinta apagada
+  for (let k = 0; k <= 2; k++) {
+    const v = (maxY / 2) * k, yy = y(v);
+    svg += `<line x1="${mIzq}" y1="${yy}" x2="${W - mDer}" y2="${yy}" stroke="#e1e0d9" stroke-width="1"/>`;
+    svg += `<text x="${mIzq - 6}" y="${yy + 3.5}" text-anchor="end" font-size="10" fill="#898781">${v.toFixed(v % 1 ? 1 : 0)}</text>`;
+  }
+  // Meses
+  MESES_CURSO.forEach((m, i) => {
+    svg += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#898781">${m}</text>`;
+  });
+  // Series
+  for (const c of centros) {
+    const vals = c[campo];
+    const puntos = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    svg += `<polyline points="${puntos}" fill="none" stroke="${c.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // Punto final con anillo de superficie + etiqueta directa (texto en tinta, no en color de serie)
+    const xf = x(n - 1), yf = y(vals[n - 1]);
+    svg += `<circle cx="${xf}" cy="${yf}" r="6" fill="#ffffff"/><circle cx="${xf}" cy="${yf}" r="4" fill="${c.color}"/>`;
+    svg += `<text x="${xf + 9}" y="${yf + 3.5}" font-size="10.5" font-weight="700" fill="#26313b">${vals[n - 1].toFixed(decimales)}</text>`;
+    // Capa de hover: un título nativo por punto
+    vals.forEach((v, i) => {
+      svg += `<circle cx="${x(i)}" cy="${y(v)}" r="9" fill="transparent"><title>${etiquetaCentro(c)} · ${MESES_CURSO[i]}: ${v.toFixed(decimales)}</title></circle>`;
+    });
+  }
+  return svg + '</svg>';
+}
+
+function leyendaSeries(centros) {
+  return `<div class="leyenda-series">${centros.map(c =>
+    `<span><span class="punto" style="background:${c.color}"></span>${etiquetaCentro(c)}</span>`).join('')}</div>`;
+}
+
+// Informe imprimible: se rellena #hoja-informe y se abre el diálogo de impresión
+// (el usuario elige "Guardar como PDF"). Sin librerías externas.
+function imprimirInformeRegional() {
+  const cs = centrosFiltrados();
+  if (!cs.length) { avisar('Ningún centro cumple los filtros: no hay nada que incluir en el informe.'); return; }
+
+  const hoy = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  const mediaUlt = cs.reduce((s, c) => s + c.incidencias100[9], 0) / cs.length;
+  const mediaIni = cs.reduce((s, c) => s + c.incidencias100[0], 0) / cs.length;
+  const cambio = Math.round(((mediaUlt - mediaIni) / mediaIni) * 100);
+  const mediaBien = cs.reduce((s, c) => s + c.bienestar.T3, 0) / cs.length;
+  const mediaPart = cs.reduce((s, c) => s + c.participacion[9], 0) / cs.length;
+
+  const filtrosTxt = [
+    regFiltros.etapa !== 'todas' ? 'etapa ' + regFiltros.etapa : '',
+    regFiltros.ruralidad !== 'todas' ? regFiltros.ruralidad : '',
+    regFiltros.tamano !== 'todos' ? 'tamaño ' + regFiltros.tamano : ''
+  ].filter(Boolean).join(' · ') || 'todos los centros del piloto';
+
+  const leyenda = `<div class="leyenda-informe">${cs.map(c =>
+    `<span><span class="punto" style="background:${c.color}"></span>${etiquetaCentro(c)}</span>`).join('')}</div>`;
+
+  const maxInc = Math.ceil(Math.max(...cs.map(c => Math.max(...c.incidencias100))));
+
+  const filasResumen = cs.map(c => `<tr>
+    <td>${etiquetaCentro(c)}</td><td>${c.etapa}</td><td>${c.ruralidad}</td><td>${c.alumnos}</td>
+    <td>${c.incidencias100[0].toFixed(1).replace('.', ',')}</td>
+    <td>${c.incidencias100[9].toFixed(1).replace('.', ',')}</td>
+    <td>${c.participacion[9]} %</td>
+    <td>${c.bienestar.T3.toFixed(1).replace('.', ',')}</td>
+  </tr>`).join('');
+
+  $('hoja-informe').innerHTML = `<div class="informe">
+    <h1>Patios Dinámicos · La Rioja</h1>
+    <div class="sub">Informe regional del piloto — curso 2025-26 · generado el ${hoy} · filtros: ${filtrosTxt}</div>
+    <div class="aviso-demo">🧪 DEMOSTRACIÓN: datos ficticios de 3 centros inventados. Los datos reales llegarán con la fase de nube.</div>
+
+    <div class="kpis-informe">
+      <div><div class="etiq">Centros incluidos</div><div class="valor">${cs.length}</div></div>
+      <div><div class="etiq">Incidencias/100 alumnos · jun</div><div class="valor">${mediaUlt.toFixed(1).replace('.', ',')}</div>
+        <div style="font-size:10px; color:${cambio <= 0 ? '#2f9e63' : '#c94f2a'};">${cambio <= 0 ? '▼' : '▲ +'}${cambio} % desde septiembre</div></div>
+      <div><div class="etiq">Bienestar alumnado · T3</div><div class="valor">${mediaBien.toFixed(1).replace('.', ',')} /5</div></div>
+      <div><div class="etiq">Participación media · jun</div><div class="valor">${Math.round(mediaPart)} %</div></div>
+    </div>
+
+    <h2>Resumen por centro</h2>
+    <table>
+      <tr><th>Centro</th><th>Etapa</th><th>Ruralidad</th><th>Alumnos</th><th>Incid./100 · sep</th><th>Incid./100 · jun</th><th>Particip. · jun</th><th>Bienestar T3</th></tr>
+      ${filasResumen}
+    </table>
+
+    <h2>Incidencias por 100 alumnos y mes</h2>
+    ${leyenda}
+    ${graficoLineasRegional(cs, 'incidencias100', maxInc, 1)}
+
+    <h2>Participación en las zonas (%)</h2>
+    ${leyenda}
+    ${graficoLineasRegional(cs, 'participacion', 100, 0)}
+
+    <div class="pie-informe">
+      Datos agregados y ${regNombresVisibles ? 'con nombres visibles (uso interno)' : 'anonimizados'} · granularidad mínima curso/grupo, nunca alumnado individual ·
+      Orientación educativa de La Rioja — Patios Dinámicos (piloto).
+    </div>
+  </div>`;
+
+  estiloPagina.textContent = '@page { size: A4 portrait; margin: 14mm; }';
+  document.body.classList.add('informe-abierto');
+  setTimeout(() => window.print(), 60); // dar tiempo al layout antes del diálogo
+}
+
+window.addEventListener('afterprint', () => {
+  if (document.body.classList.contains('informe-abierto')) {
+    document.body.classList.remove('informe-abierto');
+    $('hoja-informe').innerHTML = '';
+  }
+});
+
+async function pintarPanelRegional() {
+  const cont = $('contenido-regional');
+  const cs = centrosFiltrados();
+
+  let html = `<div class="fila-filtros">
+    <label>Etapa <select data-filtro-reg="etapa">
+      <option value="todas" ${regFiltros.etapa === 'todas' ? 'selected' : ''}>Todas</option>
+      <option value="EP" ${regFiltros.etapa === 'EP' ? 'selected' : ''}>Primaria</option>
+      <option value="ESO" ${regFiltros.etapa === 'ESO' ? 'selected' : ''}>Secundaria</option>
+    </select></label>
+    <label>Ruralidad <select data-filtro-reg="ruralidad">
+      <option value="todas" ${regFiltros.ruralidad === 'todas' ? 'selected' : ''}>Todas</option>
+      <option value="urbano" ${regFiltros.ruralidad === 'urbano' ? 'selected' : ''}>Urbano</option>
+      <option value="rural" ${regFiltros.ruralidad === 'rural' ? 'selected' : ''}>Rural</option>
+    </select></label>
+    <label>Tamaño <select data-filtro-reg="tamano">
+      <option value="todos" ${regFiltros.tamano === 'todos' ? 'selected' : ''}>Todos</option>
+      <option value="pequeno" ${regFiltros.tamano === 'pequeno' ? 'selected' : ''}>&lt;150</option>
+      <option value="medio" ${regFiltros.tamano === 'medio' ? 'selected' : ''}>150–500</option>
+      <option value="grande" ${regFiltros.tamano === 'grande' ? 'selected' : ''}>&gt;500</option>
+    </select></label>
+    <span class="separador"></span>
+    <button class="boton secundario pequeno" id="btn-reg-nombres">${regNombresVisibles ? '🙈 Anonimizar' : '👁 Mostrar nombres'}</button>
+    <button class="boton pequeno" id="btn-reg-csv">⬇️ Exportar CSV</button>
+    <button class="boton secundario pequeno" id="btn-reg-pdf" title="Se abre el diálogo de impresión: elige «Guardar como PDF»">📄 Informe PDF</button>
+  </div>`;
+
+  if (!cs.length) {
+    html += '<div class="tarjeta">Ningún centro cumple los filtros.</div>';
+  } else {
+    // KPIs regionales (media de los centros filtrados)
+    const mediaUlt = cs.reduce((s, c) => s + c.incidencias100[9], 0) / cs.length;
+    const mediaIni = cs.reduce((s, c) => s + c.incidencias100[0], 0) / cs.length;
+    const cambio = Math.round(((mediaUlt - mediaIni) / mediaIni) * 100);
+    const mediaBien = cs.reduce((s, c) => s + c.bienestar.T3, 0) / cs.length;
+    const mediaPart = cs.reduce((s, c) => s + c.participacion[9], 0) / cs.length;
+
+    html += `<div class="panel-kpis">
+      <div class="tile-dato"><div class="etiq">Centros (según filtros)</div><div class="valor">${cs.length}<small> de ${CENTROS_DEMO.length} en el piloto</small></div></div>
+      <div class="tile-dato"><div class="etiq">Incidencias / 100 alumnos · jun</div><div class="valor">${mediaUlt.toFixed(1).replace('.', ',')}</div>
+        <div class="delta ${cambio <= 0 ? 'bueno' : 'malo'}">${cambio <= 0 ? '▼ ' : '▲ +'}${cambio}% desde septiembre</div></div>
+      <div class="tile-dato"><div class="etiq">Bienestar alumnado · T3</div><div class="valor">${mediaBien.toFixed(1).replace('.', ',')}<small> /5</small></div></div>
+      <div class="tile-dato"><div class="etiq">Participación media · jun</div><div class="valor">${Math.round(mediaPart)}<small> %</small></div></div>
+    </div>`;
+
+    // Serie temporal de incidencias
+    const maxInc = Math.ceil(Math.max(...cs.map(c => Math.max(...c.incidencias100))));
+    let tablaInc = cs.map(c => `<tr><td>${etiquetaCentro(c)}</td>${c.incidencias100.map(v => `<td>${v.toFixed(1)}</td>`).join('')}</tr>`).join('');
+    html += `<div class="grafico-tarjeta">
+      <h4>Incidencias por 100 alumnos y mes (curso 2025-26)</h4>
+      ${leyendaSeries(cs)}
+      <div class="grafico-svg">${graficoLineasRegional(cs, 'incidencias100', maxInc, 1)}</div>
+      <details><summary>Ver como tabla</summary><table><tr><th>Centro</th>${MESES_CURSO.map(m => `<th>${m}</th>`).join('')}</tr>${tablaInc}</table></details>
+    </div>`;
+
+    // Participación (serie temporal)
+    let tablaPart = cs.map(c => `<tr><td>${etiquetaCentro(c)}</td>${c.participacion.map(v => `<td>${v}%</td>`).join('')}</tr>`).join('');
+    html += `<div class="rejilla-graficos"><div class="grafico-tarjeta">
+      <h4>Participación en las zonas (%)</h4>
+      ${leyendaSeries(cs)}
+      <div class="grafico-svg">${graficoLineasRegional(cs, 'participacion', 100, 0)}</div>
+      <details><summary>Ver como tabla</summary><table><tr><th>Centro</th>${MESES_CURSO.map(m => `<th>${m}</th>`).join('')}</tr>${tablaPart}</table></details>
+    </div>`;
+
+    // Bienestar por trimestre (barras horizontales por centro, valor a la punta)
+    let bloquesBien = '';
+    for (const tri of ['T1', 'T2', 'T3']) {
+      bloquesBien += `<div style="font-size:11.5px; font-weight:700; color:var(--tinta-suave); margin-top:10px;">${tri}</div>`;
+      for (const c of cs) {
+        bloquesBien += `<div class="fila-barra" title="${etiquetaCentro(c)} · ${tri}: ${c.bienestar[tri].toFixed(1)}/5">
+          <span class="etiq"><span class="punto" style="background:${c.color}; border-radius:50%;"></span>${etiquetaCentro(c)}</span>
+          <span class="pista"><span class="barra" style="width:${(c.bienestar[tri] / 5) * 100}%; background:${c.color}"></span></span>
+          <span class="num">${c.bienestar[tri].toFixed(1).replace('.', ',')}</span></div>`;
+      }
+    }
+    html += `<div class="grafico-tarjeta">
+      <h4>Bienestar del alumnado por trimestre (1–5)</h4>
+      ${bloquesBien}
+    </div></div>`;
+  }
+  cont.innerHTML = html;
+
+  cont.querySelectorAll('[data-filtro-reg]').forEach(sel => sel.addEventListener('change', () => {
+    regFiltros[sel.dataset.filtroReg] = sel.value;
+    pintarPanelRegional();
+  }));
+  $('btn-reg-nombres').addEventListener('click', () => {
+    regNombresVisibles = !regNombresVisibles;
+    pintarPanelRegional();
+  });
+  $('btn-reg-csv').addEventListener('click', () => {
+    let csv = '﻿centro;etapa;ruralidad;alumnos;mes;incidencias_100;participacion_pct\n';
+    for (const c of centrosFiltrados()) {
+      MESES_CURSO.forEach((m, i) => {
+        csv += `${etiquetaCentro(c)};${c.etapa};${c.ruralidad};${c.alumnos};${m};${c.incidencias100[i].toFixed(1).replace('.', ',')};${c.participacion[i]}\n`;
+      });
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'informe-regional-demo.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    avisar('CSV exportado (datos ficticios de demostración).');
+  });
+  $('btn-reg-pdf').addEventListener('click', imprimirInformeRegional);
+}
+
+/* ============================================================
+   MULTI-PATIO: selector, crear/renombrar/borrar y copia completa
+   ============================================================ */
+let patios = [];
+let modoModalPatio = null; // 'nuevo' | 'renombrar'
+let copiaPendiente = null;
+
+function pintarSelectorPatio() {
+  const sel = $('selector-patio');
+  sel.innerHTML = patios.map(p =>
+    `<option value="${p.id}" ${p.id === DataLayer.patioActivo ? 'selected' : ''}>${p.nombre}</option>`).join('');
+  // El último patio no se puede borrar: siempre debe quedar uno
+  $('btn-patio-borrar').disabled = patios.length < 2;
+}
+
+function limpiarMapa() {
+  if (perimetroLayer) { mapa.removeLayer(perimetroLayer); perimetroLayer = null; }
+  borrarTodasLasZonas();
+}
+
+async function activarPatio(id) {
+  DataLayer.cambiarPatio(id);
+  const guardado = await DataLayer.cargarPatio();
+  limpiarMapa();
+  if (guardado) cargarDesdeGeoJSON(guardado);
+  else refrescarTodo();
+  pintarSelectorPatio();
+}
+
+$('selector-patio').addEventListener('change', async e => {
+  await activarPatio(e.target.value);
+  const p = patios.find(x => x.id === e.target.value);
+  avisar(`Patio activo: ${p ? p.nombre : e.target.value}. Rotación, incidencias y recuentos ahora son los de este patio.`);
+});
+
+function abrirModalPatio(modo) {
+  modoModalPatio = modo;
+  const p = patios.find(x => x.id === DataLayer.patioActivo);
+  $('modal-patio-titulo').textContent = modo === 'nuevo' ? 'Nuevo patio' : 'Renombrar patio';
+  $('patio-nombre').value = modo === 'renombrar' && p ? p.nombre : '';
+  $('velo-patio').classList.add('visible');
+  $('patio-nombre').focus();
+}
+
+$('btn-patio-nuevo').addEventListener('click', () => abrirModalPatio('nuevo'));
+$('btn-patio-renombrar').addEventListener('click', () => abrirModalPatio('renombrar'));
+$('patio-cancelar').addEventListener('click', () => $('velo-patio').classList.remove('visible'));
+
+$('patio-aceptar').addEventListener('click', async () => {
+  const nombre = $('patio-nombre').value.trim();
+  if (!nombre) { avisar('Escribe un nombre para el patio.'); return; }
+  if (modoModalPatio === 'nuevo') {
+    const p = DataLayer.crearPatio(nombre);
+    patios = DataLayer.listarPatios();
+    await activarPatio(p.id);
+    avisar(`Patio "${nombre}" creado: dibuja su perímetro y sus zonas.`);
+  } else {
+    DataLayer.renombrarPatio(DataLayer.patioActivo, nombre);
+    patios = DataLayer.listarPatios();
+    pintarSelectorPatio();
+  }
+  $('velo-patio').classList.remove('visible');
+});
+
+// Borrado en dos toques: el primero pide confirmación en el propio botón
+let confirmarBorradoPatio = null;
+$('btn-patio-borrar').addEventListener('click', async () => {
+  const b = $('btn-patio-borrar');
+  if (!confirmarBorradoPatio) {
+    b.textContent = '¿Seguro? Borra TODO el patio';
+    confirmarBorradoPatio = setTimeout(() => { b.textContent = 'Borrar'; confirmarBorradoPatio = null; }, 5000);
+    return;
+  }
+  clearTimeout(confirmarBorradoPatio);
+  confirmarBorradoPatio = null;
+  b.textContent = 'Borrar';
+  const borrado = patios.find(x => x.id === DataLayer.patioActivo);
+  DataLayer.borrarPatio(DataLayer.patioActivo);
+  patios = DataLayer.listarPatios();
+  await activarPatio(patios[0].id);
+  avisar(`Patio "${borrado ? borrado.nombre : ''}" borrado con todos sus registros.`);
+});
+
+/* --- Copia completa: descargar / restaurar --- */
+$('btn-copia-exportar').addEventListener('click', () => {
+  const copia = DataLayer.exportarTodo();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(copia, null, 2)], { type: 'application/json' }));
+  a.download = 'patios-dinamicos-copia-' + fechaISOLocal() + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  avisar('Copia completa descargada. Guárdala o pásala al otro dispositivo.');
+});
+
+$('btn-copia-importar').addEventListener('click', () => { $('entrada-copia').value = ''; $('entrada-copia').click(); });
+
+$('entrada-copia').addEventListener('change', async () => {
+  const archivo = $('entrada-copia').files[0];
+  if (!archivo) return;
+  try {
+    const copia = JSON.parse(await archivo.text());
+    if (copia.formato !== 'patios-dinamicos-copia') throw new Error('no es una copia de Patios Dinámicos');
+    copiaPendiente = copia;
+    $('confirmar-copia').style.display = 'block';
+  } catch (err) {
+    copiaPendiente = null;
+    avisar('Archivo no válido: ' + err.message);
+  }
+});
+
+$('btn-copia-cancelar').addEventListener('click', () => {
+  copiaPendiente = null;
+  $('confirmar-copia').style.display = 'none';
+});
+
+$('btn-copia-confirmar').addEventListener('click', async () => {
+  if (!copiaPendiente) return;
+  try {
+    DataLayer.importarTodo(copiaPendiente);
+    patios = DataLayer.listarPatios();
+    await activarPatio(DataLayer.patioActivo);
+    avisar('Copia restaurada: ' + patios.length + (patios.length === 1 ? ' patio' : ' patios') + ' con todos sus registros.');
+  } catch (err) {
+    avisar('No se pudo restaurar: ' + err.message);
+  }
+  copiaPendiente = null;
+  $('confirmar-copia').style.display = 'none';
+});
+
+/* ============================================================
+   NAVEGACIÓN ENTRE VISTAS
+   ============================================================ */
+document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('nav.principal button').forEach(x => x.classList.remove('activo'));
+    b.classList.add('activo');
+    document.querySelectorAll('.vista').forEach(v => v.classList.remove('visible'));
+    $(b.dataset.vista).classList.add('visible');
+    $('titulo-vista').textContent = b.dataset.titulo;
+    if (b.dataset.vista === 'vista-editor') mapa.invalidateSize();
+    if (b.dataset.vista === 'vista-rotacion') pintarRotacion();
+    if (b.dataset.vista === 'vista-incidencias') pintarIncidencias();
+    if (b.dataset.vista === 'vista-ocupacion') pintarOcupacion();
+    if (b.dataset.vista === 'vista-encuestas') pintarEncuestas();
+    if (b.dataset.vista === 'vista-panel-centro') pintarPanelCentro();
+    if (b.dataset.vista === 'vista-regional') pintarPanelRegional();
+  });
+});
+
+/* ============================================================
+   ARRANQUE: cargar patio guardado si existe
+   ============================================================ */
+(async function iniciar() {
+  patios = DataLayer.iniciarPatios();
+  pintarSelectorPatio();
+  const guardado = await DataLayer.cargarPatio();
+  if (guardado) cargarDesdeGeoJSON(guardado);
+  refrescarTodo();
+})();
+</script>
+</body>
+</html>
