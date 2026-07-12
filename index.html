@@ -531,6 +531,81 @@ body.modo-hoy .panel-hoy { display: block; }
 }
 .resumen-encuestas { max-width: 620px; margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
+/* ---------- Kiosco de encuesta (pantalla completa, a prueba de dedos) ---------- */
+#velo-kiosco {
+  position: fixed; inset: 0; z-index: 2600; display: none;
+  background: var(--hormigon); overflow-y: auto;
+}
+#velo-kiosco.visible { display: block; }
+.kiosco-cabecera {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--asfalto); color: var(--tiza);
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+}
+.kiosco-cabecera .titulo { font-family: var(--fuente-titulo); font-weight: 700; font-size: 16px; flex: 1; }
+.kiosco-cabecera .contador {
+  background: var(--asfalto-3); border-radius: 999px; padding: 4px 13px; font-size: 13px; font-weight: 700;
+}
+#btn-kiosco-terminar {
+  background: none; border: 1.5px solid rgba(255,255,255,.5); border-radius: 999px;
+  color: var(--tiza); font-family: var(--fuente-cuerpo); font-size: 12.5px;
+  padding: 6px 14px; cursor: pointer; position: relative; overflow: hidden;
+}
+#btn-kiosco-terminar .progreso {
+  position: absolute; inset: 0; background: rgba(255,255,255,.25); width: 0%;
+}
+#btn-kiosco-terminar span { position: relative; }
+.kiosco-cuerpo { max-width: 640px; margin: 0 auto; padding: 18px 16px 40px; }
+.kiosco-cuerpo .escala-likert button { font-size: 34px; padding: 12px 0; }
+.kiosco-cuerpo .item-encuesta { margin-top: 12px; }
+.kiosco-cuerpo .pregunta { font-size: 16px !important; }
+#kiosco-gracias {
+  display: none; text-align: center; padding: 60px 20px;
+}
+#kiosco-gracias .emoji { font-size: 84px; }
+#kiosco-gracias h2 { font-family: var(--fuente-titulo); font-size: 30px; margin: 12px 0 26px; }
+#btn-kiosco-siguiente { font-size: 19px; padding: 16px 34px; border-radius: 14px; }
+
+/* Volcado de papel: contadores por carita */
+.volcado-item { background: var(--tiza); border: 1px solid var(--hormigon-2); border-radius: 10px; padding: 11px 13px; margin-top: 10px; }
+.volcado-item .pregunta { font-size: 13.5px; font-weight: 700; margin-bottom: 8px; }
+.volcado-conteos { display: flex; gap: 6px; }
+.volcado-conteos .celda { flex: 1; text-align: center; }
+.volcado-conteos .cara { font-size: 21px; }
+.volcado-conteos input {
+  width: 100%; text-align: center; padding: 7px 2px; border: 1.5px solid var(--hormigon-2);
+  border-radius: 8px; font-family: var(--fuente-cuerpo); font-size: 15px; font-weight: 700;
+}
+.volcado-item .total-item { font-size: 11.5px; color: var(--tinta-suave); text-align: right; margin-top: 4px; }
+
+/* Sesiones de encuesta registradas */
+.tabla-sesiones { border-collapse: collapse; background: var(--tiza); font-size: 12.5px; margin-top: 8px; }
+.tabla-sesiones th, .tabla-sesiones td { border: 1px solid var(--hormigon-2); padding: 5px 10px; text-align: left; }
+.tabla-sesiones th { background: var(--hormigon); font-weight: 700; }
+
+/* ---------- Formulario de encuesta imprimible (papel) ---------- */
+#hoja-formulario { display: none; }
+#hoja-formulario .form-papel {
+  font-family: var(--fuente-cuerpo); color: #26313b;
+  print-color-adjust: exact; -webkit-print-color-adjust: exact;
+}
+#hoja-formulario h1 { font-family: var(--fuente-titulo); font-size: 20px; }
+#hoja-formulario .sub { font-size: 12px; color: #5c6670; margin: 2px 0 10px; }
+#hoja-formulario .item-papel { border: 1.5px solid #d8d5cc; border-radius: 8px; padding: 8px 12px; margin-top: 9px; page-break-inside: avoid; }
+#hoja-formulario .item-papel .pregunta { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+#hoja-formulario .escala-papel { display: flex; gap: 8px; }
+#hoja-formulario .escala-papel .opcion { flex: 1; text-align: center; }
+#hoja-formulario .escala-papel .cara { font-size: 26px; line-height: 1.2; }
+#hoja-formulario .escala-papel .circulo {
+  width: 17px; height: 17px; border: 2px solid #26313b; border-radius: 50%;
+  display: inline-block; margin-top: 3px;
+}
+#hoja-formulario .pie-papel { font-size: 10.5px; color: #5c6670; margin-top: 10px; }
+@media print {
+  body.formulario-abierto > :not(#hoja-formulario) { display: none !important; }
+  body.formulario-abierto #hoja-formulario { display: block; }
+}
+
 /* ---------- Panel del centro (gráficos) ---------- */
 #contenido-panel { max-width: 940px; display: flex; flex-direction: column; gap: 14px; }
 .panel-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
@@ -891,7 +966,7 @@ body.modo-hoy .panel-hoy { display: block; }
 
 <section id="vista-encuestas" class="vista vista-mock">
   <h2>Encuesta trimestral de bienestar</h2>
-  <p>Anónima y agregada por curso — <strong>nunca se pide el nombre</strong>. La respuesta alimenta la serie temporal del centro y, agregada, la de la red regional.</p>
+  <p>Anónima y agregada por curso — <strong>nunca se pide el nombre</strong>. Pásala por <strong>kiosco</strong> (este dispositivo de mano en mano) o en <strong>papel</strong> (imprimir y volcar recuentos); cada pase queda registrado para evitar encuestar dos veces al mismo curso.</p>
   <div id="contenido-encuestas"></div>
 </section>
 
@@ -1026,6 +1101,26 @@ body.modo-hoy .panel-hoy { display: block; }
   </div>
 </div>
 
+<!-- ===================== Kiosco de encuesta (pantalla completa) ===================== -->
+<div id="velo-kiosco">
+  <div class="kiosco-cabecera">
+    <span class="titulo" id="kiosco-titulo">Encuesta anónima</span>
+    <span class="contador" id="kiosco-contador">0 respuestas</span>
+    <button id="btn-kiosco-terminar" title="Solo profesorado: mantener pulsado para cerrar la sesión">
+      <span class="progreso"></span><span>Mantén pulsado para terminar</span>
+    </button>
+  </div>
+  <div class="kiosco-cuerpo" id="kiosco-cuerpo"></div>
+  <div id="kiosco-gracias">
+    <div class="emoji">🎉</div>
+    <h2>¡Gracias por tu respuesta!</h2>
+    <button class="boton" id="btn-kiosco-siguiente">➡️ Siguiente persona</button>
+  </div>
+</div>
+
+<!-- ===================== Formulario de encuesta imprimible (papel) ===================== -->
+<div id="hoja-formulario"></div>
+
 <!-- ===================== Informe regional imprimible ===================== -->
 <div id="hoja-informe"></div>
 
@@ -1116,7 +1211,7 @@ function diaLectivoHoy() {
   return d > 4 ? { dia: 0, finde: true } : { dia: d, finde: false };
 }
 
-const TIPOS_DATO_PATIO = ['patio', 'rotacion', 'incidencias', 'ocupacion', 'encuestas'];
+const TIPOS_DATO_PATIO = ['patio', 'rotacion', 'incidencias', 'ocupacion', 'encuestas', 'sesiones-encuesta'];
 
 const DataLayer = {
   PREFIJO: 'patios-dinamicos',
@@ -1304,6 +1399,23 @@ const DataLayer = {
 
   async listarEncuestas() {
     const bruto = localStorage.getItem(this._clave('encuestas'));
+    return bruto ? JSON.parse(bruto) : [];
+  },
+
+  // Sesiones de pase de encuesta: { id, fecha, trimestre, tipoRespondente, curso,
+  // metodo ('kiosco'|'papel'), n }. Son el control anti dobles envíos: la encuesta
+  // es anónima (sin nombres, por diseño), así que la unidad de control es el
+  // curso — si un curso ya tiene sesión este trimestre, la app avisa.
+  async guardarSesionEncuesta(s) {
+    const lista = await this.listarSesionesEncuesta();
+    s.id = this._nuevoId('s');
+    lista.push(s);
+    localStorage.setItem(this._clave('sesiones-encuesta'), JSON.stringify(lista));
+    return { ok: true };
+  },
+
+  async listarSesionesEncuesta() {
+    const bruto = localStorage.getItem(this._clave('sesiones-encuesta'));
     return bruto ? JSON.parse(bruto) : [];
   },
 
@@ -2892,13 +3004,30 @@ function trimestreActual(d = new Date()) {
   return m >= 9 ? 'T1' : m <= 3 ? 'T2' : 'T3';
 }
 
+/* Control anti dobles envíos: la encuesta es anónima (nunca hay nombres), así
+   que la unidad de control es el curso. Cada pase (kiosco o papel) registra una
+   sesión; si el mismo curso vuelve a encuestarse este trimestre, se avisa. */
+async function sesionesPrevias(colectivo, curso) {
+  const tri = trimestreActual();
+  return (await DataLayer.listarSesionesEncuesta())
+    .filter(s => s.trimestre === tri && s.tipoRespondente === colectivo && s.curso === curso);
+}
+
+function resumenSesiones(previas) {
+  const n = previas.reduce((s, x) => s + x.n, 0);
+  const metodos = [...new Set(previas.map(s => s.metodo))].join(' y ');
+  return `${n} respuesta${n === 1 ? '' : 's'} por ${metodos}`;
+}
+
+/* --- Pantalla de gestión (la ve el profesorado): kiosco, papel y sesiones --- */
 async function pintarEncuestas() {
   const cont = $('contenido-encuestas');
-  encSel = { respondente: encSel.respondente || 'alumnado', curso: null, respuestas: {} };
+  encSel = { respondente: encSel.respondente || 'alumnado', curso: null };
   const rot = await DataLayer.cargarRotacion();
   const grupos = (rot && rot.grupos && rot.grupos.length) ? rot.grupos : [...GRUPOS_MOCK];
   const esAlumnado = encSel.respondente === 'alumnado';
-  const items = ITEMS_ENCUESTA[encSel.respondente];
+  const tri = trimestreActual();
+  const sesiones = (await DataLayer.listarSesionesEncuesta()).filter(s => s.trimestre === tri);
 
   let html = `<div class="form-encuesta">
     <div class="pestanas-respondente">
@@ -2908,24 +3037,39 @@ async function pintarEncuestas() {
 
   if (esAlumnado) {
     html += `<div>
-      <div class="paso-titulo"><span class="paso">1</span> ¿De qué curso eres?</div>
+      <div class="paso-titulo"><span class="paso">1</span> ¿Qué curso vas a encuestar?</div>
       <div class="chips-curso" id="chips-curso-enc">${grupos.map(g => `<button data-curso-enc="${esc(g)}">${esc(g)}</button>`).join('')}</div>
     </div>`;
   }
 
-  html += `<div><div class="paso-titulo"><span class="paso">${esAlumnado ? 2 : 1}</span> ${esAlumnado ? 'Marca la carita que más se parezca a ti' : 'Indica tu grado de acuerdo (1 = nada · 5 = totalmente)'}</div>`;
-  items.forEach((pregunta, i) => {
-    html += `<div class="item-encuesta">
-      <div class="pregunta">${pregunta}</div>
-      <div class="escala-likert">${ESCALA_LIKERT.map((cara, v) =>
-        `<button data-item="${i}" data-valor="${v + 1}" title="${v + 1} de 5">${cara}</button>`).join('')}</div>
-    </div>`;
-  });
-  html += `</div>
-    <input type="text" id="enc-comentario" maxlength="200" placeholder="Comentario opcional (sin nombres propios)">
-    <button class="boton" id="btn-enviar-encuesta" style="padding:13px; font-size:15px; border-radius:12px;">📨 Enviar respuesta anónima</button>
+  html += `<div>
+      <div class="paso-titulo"><span class="paso">${esAlumnado ? 2 : 1}</span> ¿Cómo la vas a pasar?</div>
+      <div class="botonera-grande">
+        <button id="btn-abrir-kiosco"><span class="ic">🖥️</span>Kiosco en este dispositivo</button>
+        <button id="btn-imprimir-formulario"><span class="ic">🖨️</span>Formulario de papel</button>
+        <button id="btn-abrir-volcado"><span class="ic">📥</span>Volcar papel ya pasado</button>
+      </div>
+      <p style="font-size:12px; color:var(--tinta-suave); margin-top:8px;">
+        <strong>Kiosco</strong>: el dispositivo pasa de mano en mano y cada persona responde (pantalla completa, con contador).
+        <strong>Papel</strong>: imprime el formulario, pásalo a toda la clase a la vez y vuelca aquí los recuentos.
+        Cada pase queda registrado por curso para avisar de dobles envíos.
+      </p>
+    </div>
   </div>
   <div class="resumen-encuestas" id="resumen-encuestas"></div>`;
+
+  // Sesiones ya registradas este trimestre (el registro anti dobles envíos)
+  if (sesiones.length) {
+    html += `<div style="margin-top:20px; max-width:620px;">
+      <div class="paso-titulo" style="font-family:var(--fuente-titulo);">Pases registrados este trimestre (${tri})</div>
+      <table class="tabla-sesiones"><tr><th>Fecha</th><th>Colectivo</th><th>Curso</th><th>Método</th><th>Respuestas</th></tr>
+      ${[...sesiones].reverse().map(s => `<tr>
+        <td>${s.fecha}</td><td>${s.tipoRespondente === 'alumnado' ? '🧒 Alumnado' : '🧑‍🏫 Profesorado'}</td>
+        <td>${esc(s.curso)}</td><td>${s.metodo === 'kiosco' ? '🖥️ Kiosco' : '🖨️ Papel'}</td><td>${s.n}</td>
+      </tr>`).join('')}
+      </table>
+    </div>`;
+  }
 
   cont.innerHTML = html;
 
@@ -2938,32 +3082,264 @@ async function pintarEncuestas() {
     b.classList.add('elegido');
     encSel.curso = b.dataset.cursoEnc;
   }));
-  cont.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => {
-    cont.querySelectorAll(`[data-item="${b.dataset.item}"]`).forEach(x => x.classList.remove('elegido'));
+
+  const cursoElegido = () => {
+    if (esAlumnado && !encSel.curso) { avisar('Elige primero el curso que vas a encuestar.'); return null; }
+    return esAlumnado ? encSel.curso : 'claustro';
+  };
+
+  $('btn-abrir-kiosco').addEventListener('click', async () => {
+    const curso = cursoElegido();
+    if (!curso) return;
+    const previas = await sesionesPrevias(encSel.respondente, curso);
+    if (previas.length) {
+      avisar(`⚠️ ${esAlumnado ? curso : 'El claustro'} ya tiene ${resumenSesiones(previas)} este trimestre.`,
+        { texto: 'Abrir igualmente', fn: () => abrirKiosco(encSel.respondente, curso) });
+      return;
+    }
+    abrirKiosco(encSel.respondente, curso);
+  });
+
+  $('btn-imprimir-formulario').addEventListener('click', () => {
+    imprimirFormularioPapel(encSel.respondente, esAlumnado ? encSel.curso : null);
+  });
+
+  $('btn-abrir-volcado').addEventListener('click', () => {
+    const curso = cursoElegido();
+    if (!curso) return;
+    pintarVolcado(encSel.respondente, curso);
+  });
+
+  pintarResumenEncuestas();
+}
+
+/* --- Kiosco: pantalla completa, el dispositivo pasa de mano en mano --- */
+let kiosco = null; // { colectivo, curso, contador, respuestas }
+
+function abrirKiosco(colectivo, curso) {
+  kiosco = { colectivo, curso, contador: 0, respuestas: {} };
+  $('kiosco-titulo').textContent = colectivo === 'alumnado'
+    ? `Encuesta anónima · ${curso}` : 'Encuesta anónima · profesorado';
+  $('velo-kiosco').classList.add('visible');
+  // Pantalla completa si el dispositivo lo permite (más difícil salirse sin querer)
+  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  pintarFormKiosco();
+}
+
+function pintarFormKiosco() {
+  kiosco.respuestas = {};
+  $('kiosco-contador').textContent = kiosco.contador + (kiosco.contador === 1 ? ' respuesta' : ' respuestas');
+  $('kiosco-gracias').style.display = 'none';
+  const cuerpo = $('kiosco-cuerpo');
+  cuerpo.style.display = '';
+  const esAlumnado = kiosco.colectivo === 'alumnado';
+  const items = ITEMS_ENCUESTA[kiosco.colectivo];
+
+  let html = `<p class="ayuda" style="font-size:14px;">${esAlumnado
+    ? 'Marca la carita que más se parezca a ti. Nadie sabrá qué has respondido.'
+    : 'Indica tu grado de acuerdo (1 = nada · 5 = totalmente). La respuesta es anónima.'}</p>`;
+  items.forEach((pregunta, i) => {
+    html += `<div class="item-encuesta">
+      <div class="pregunta">${pregunta}</div>
+      <div class="escala-likert">${ESCALA_LIKERT.map((cara, v) =>
+        `<button data-item="${i}" data-valor="${v + 1}" title="${v + 1} de 5">${cara}</button>`).join('')}</div>
+    </div>`;
+  });
+  html += `<button class="boton" id="btn-enviar-kiosco" style="width:100%; padding:15px; font-size:17px; border-radius:12px; margin-top:14px;">📨 Enviar respuesta anónima</button>`;
+  cuerpo.innerHTML = html;
+
+  cuerpo.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => {
+    cuerpo.querySelectorAll(`[data-item="${b.dataset.item}"]`).forEach(x => x.classList.remove('elegido'));
     b.classList.add('elegido');
-    encSel.respuestas[b.dataset.item] = +b.dataset.valor;
+    kiosco.respuestas[b.dataset.item] = +b.dataset.valor;
   }));
 
-  $('btn-enviar-encuesta').addEventListener('click', async () => {
-    if (esAlumnado && !encSel.curso) { avisar('Falta el curso.'); return; }
-    const valores = items.map((_, i) => encSel.respuestas[i]);
+  $('btn-enviar-kiosco').addEventListener('click', async () => {
+    const valores = items.map((_, i) => kiosco.respuestas[i]);
     const sinResponder = valores.findIndex(v => !v);
     if (sinResponder !== -1) { avisar(`Falta responder la pregunta ${sinResponder + 1}.`); return; }
     const media = valores.reduce((s, v) => s + v, 0) / valores.length;
     await DataLayer.guardarEncuesta({
       fecha: fechaISOLocal(),
       trimestre: trimestreActual(),
-      tipoRespondente: encSel.respondente,
-      curso: esAlumnado ? encSel.curso : 'claustro',
+      tipoRespondente: kiosco.colectivo,
+      curso: kiosco.curso,
       puntuacion: Math.round(media * 10) / 10,
       respuestas: valores,
-      comentario: $('enc-comentario').value.trim()
+      comentario: '',
+      metodo: 'kiosco'
     });
-    avisar('✓ ¡Gracias! Respuesta anónima enviada.');
-    pintarEncuestas(); // formulario limpio para la siguiente persona
+    kiosco.contador++;
+    $('kiosco-contador').textContent = kiosco.contador + (kiosco.contador === 1 ? ' respuesta' : ' respuestas');
+    $('kiosco-cuerpo').style.display = 'none';
+    $('kiosco-gracias').style.display = 'block';
   });
+}
 
-  pintarResumenEncuestas();
+$('btn-kiosco-siguiente').addEventListener('click', pintarFormKiosco);
+
+async function cerrarKiosco() {
+  if (kiosco && kiosco.contador > 0) {
+    await DataLayer.guardarSesionEncuesta({
+      fecha: fechaISOLocal(), trimestre: trimestreActual(),
+      tipoRespondente: kiosco.colectivo, curso: kiosco.curso,
+      metodo: 'kiosco', n: kiosco.contador
+    });
+    avisar(`Sesión de kiosco cerrada: ${kiosco.contador} respuesta${kiosco.contador === 1 ? '' : 's'} de ${kiosco.colectivo === 'alumnado' ? kiosco.curso : 'profesorado'}.`);
+  }
+  kiosco = null;
+  $('velo-kiosco').classList.remove('visible');
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  pintarEncuestas();
+}
+
+// Terminar con pulsación mantenida (1,5 s): un crío que toque el botón no cierra nada
+(() => {
+  const btn = $('btn-kiosco-terminar');
+  const barra = btn.querySelector('.progreso');
+  let temporizador = null, inicio = 0, animacion = null;
+  const soltar = () => {
+    clearTimeout(temporizador); temporizador = null;
+    cancelAnimationFrame(animacion);
+    barra.style.width = '0%';
+  };
+  btn.addEventListener('pointerdown', () => {
+    inicio = Date.now();
+    const animar = () => {
+      barra.style.width = Math.min(100, (Date.now() - inicio) / 15) + '%';
+      animacion = requestAnimationFrame(animar);
+    };
+    animar();
+    temporizador = setTimeout(() => { soltar(); cerrarKiosco(); }, 1500);
+  });
+  btn.addEventListener('pointerup', soltar);
+  btn.addEventListener('pointerleave', soltar);
+})();
+
+/* --- Formulario de papel imprimible --- */
+function imprimirFormularioPapel(colectivo, curso) {
+  const esAlumnado = colectivo === 'alumnado';
+  const items = ITEMS_ENCUESTA[colectivo];
+  const escala = `<div class="escala-papel">${ESCALA_LIKERT.map((cara, v) =>
+    `<div class="opcion"><div class="cara">${cara}</div><div style="font-size:10px; color:#5c6670;">${v + 1}</div><span class="circulo"></span></div>`).join('')}</div>`;
+
+  $('hoja-formulario').innerHTML = `<div class="form-papel">
+    <h1>${esAlumnado ? '¿Cómo va el patio? 🛝' : 'Encuesta al profesorado · patios dinámicos'}</h1>
+    <div class="sub">
+      Encuesta <strong>anónima</strong> — no escribas tu nombre.
+      ${esAlumnado ? (curso ? `Curso: <strong>${esc(curso)}</strong>` : 'Curso: ________________') : 'Colectivo: claustro'}
+      · ${trimestreActual()} · Patios Dinámicos La Rioja
+    </div>
+    ${esAlumnado
+      ? '<div class="sub">Rodea o marca la carita que más se parezca a ti en cada pregunta.</div>'
+      : '<div class="sub">Marca tu grado de acuerdo: 1 = nada de acuerdo · 5 = totalmente de acuerdo.</div>'}
+    ${items.map((pregunta, i) => `<div class="item-papel">
+      <div class="pregunta">${i + 1}. ${pregunta}</div>
+      ${escala}
+    </div>`).join('')}
+    <div class="pie-papel">Al terminar, entrega la hoja doblada. Los resultados se cuentan por curso, nunca por persona.</div>
+  </div>`;
+
+  estiloPagina.textContent = '@page { size: A4 portrait; margin: 13mm; }';
+  document.body.classList.add('formulario-abierto');
+  setTimeout(() => window.print(), 60);
+}
+
+/* --- Volcado de resultados de papel (recuentos por carita y pregunta) --- */
+function pintarVolcado(colectivo, curso) {
+  const cont = $('contenido-encuestas');
+  const esAlumnado = colectivo === 'alumnado';
+  const items = ITEMS_ENCUESTA[colectivo];
+
+  let html = `<div class="form-encuesta">
+    <div class="paso-titulo" style="font-family:var(--fuente-titulo);">
+      📥 Volcar papel · ${esAlumnado ? esc(curso) : 'profesorado'} · ${trimestreActual()}
+    </div>
+    <p style="font-size:12.5px; color:var(--tinta-suave);">
+      Cuenta las papeletas: para cada pregunta, escribe cuántas personas marcaron cada carita.
+      Si alguien dejó una pregunta en blanco, simplemente no la cuentes.
+    </p>`;
+  items.forEach((pregunta, i) => {
+    html += `<div class="volcado-item">
+      <div class="pregunta">${i + 1}. ${pregunta}</div>
+      <div class="volcado-conteos">${ESCALA_LIKERT.map((cara, v) => `
+        <div class="celda"><div class="cara">${cara}</div>
+        <input type="number" min="0" max="999" value="0" data-volcado-item="${i}" data-valor="${v + 1}" inputmode="numeric"></div>`).join('')}
+      </div>
+      <div class="total-item" data-total-item="${i}">0 papeletas</div>
+    </div>`;
+  });
+  html += `<div class="fila-botones">
+      <button class="boton" id="btn-guardar-volcado">💾 Guardar recuentos</button>
+      <button class="boton secundario" id="btn-cancelar-volcado">Volver</button>
+    </div>
+    <p id="volcado-resumen" style="font-size:12.5px; color:var(--tinta-suave);"></p>
+  </div>`;
+  cont.innerHTML = html;
+
+  const totales = () => items.map((_, i) =>
+    [...cont.querySelectorAll(`[data-volcado-item="${i}"]`)].reduce((s, inp) => s + (parseInt(inp.value, 10) || 0), 0));
+
+  cont.querySelectorAll('[data-volcado-item]').forEach(inp => inp.addEventListener('input', () => {
+    const t = totales();
+    items.forEach((_, i) => {
+      cont.querySelector(`[data-total-item="${i}"]`).textContent = t[i] + ' papeleta' + (t[i] === 1 ? '' : 's');
+    });
+    const max = Math.max(...t);
+    $('volcado-resumen').textContent = max ? `Se guardarán ${max} respuestas (la pregunta con más papeletas marca el total).` : '';
+  }));
+
+  $('btn-cancelar-volcado').addEventListener('click', pintarEncuestas);
+
+  $('btn-guardar-volcado').addEventListener('click', async () => {
+    const conteos = items.map((_, i) =>
+      [1, 2, 3, 4, 5].map(v => parseInt(cont.querySelector(`[data-volcado-item="${i}"][data-valor="${v}"]`).value, 10) || 0));
+    const n = Math.max(...conteos.map(c => c.reduce((s, v) => s + v, 0)));
+    if (!n) { avisar('Introduce al menos un recuento.'); return; }
+    const previas = await sesionesPrevias(colectivo, curso);
+    if (previas.length) {
+      avisar(`⚠️ ${esAlumnado ? curso : 'El claustro'} ya tiene ${resumenSesiones(previas)} este trimestre.`,
+        { texto: 'Guardar igualmente', fn: () => guardarVolcado(colectivo, curso, conteos, n) });
+      return;
+    }
+    guardarVolcado(colectivo, curso, conteos, n);
+  });
+}
+
+// Convierte los recuentos agregados en filas individuales (marcadas metodo:'papel').
+// Las medias por pregunta y globales salen EXACTAS; cada columna se baraja para
+// no inventar correlaciones entre preguntas dentro de una misma fila.
+async function guardarVolcado(colectivo, curso, conteos, n) {
+  const columnas = conteos.map(c => {
+    const vals = [];
+    c.forEach((cuantos, idx) => { for (let j = 0; j < cuantos; j++) vals.push(idx + 1); });
+    for (let j = vals.length - 1; j > 0; j--) {
+      const r = Math.floor(Math.random() * (j + 1));
+      [vals[j], vals[r]] = [vals[r], vals[j]];
+    }
+    while (vals.length < n) vals.push(null); // preguntas dejadas en blanco
+    return vals;
+  });
+  for (let f = 0; f < n; f++) {
+    const respuestas = columnas.map(c => c[f]);
+    const validas = respuestas.filter(v => typeof v === 'number');
+    await DataLayer.guardarEncuesta({
+      fecha: fechaISOLocal(),
+      trimestre: trimestreActual(),
+      tipoRespondente: colectivo,
+      curso,
+      puntuacion: Math.round((validas.reduce((s, v) => s + v, 0) / validas.length) * 10) / 10,
+      respuestas,
+      comentario: '',
+      metodo: 'papel'
+    });
+  }
+  await DataLayer.guardarSesionEncuesta({
+    fecha: fechaISOLocal(), trimestre: trimestreActual(),
+    tipoRespondente: colectivo, curso, metodo: 'papel', n
+  });
+  avisar(`✓ Volcado guardado: ${n} respuesta${n === 1 ? '' : 's'} de ${colectivo === 'alumnado' ? curso : 'profesorado'}.`);
+  pintarEncuestas();
 }
 
 async function pintarResumenEncuestas() {
@@ -3263,10 +3639,10 @@ async function pintarPanelCentro() {
   });
 
   if (encs.length) $('csv-encuestas').addEventListener('click', () => {
-    let csv = 'fecha;trimestre;colectivo;curso;media;p1;p2;p3;p4;p5;p6;comentario\n';
+    let csv = 'fecha;trimestre;colectivo;curso;metodo;media;p1;p2;p3;p4;p5;p6;comentario\n';
     for (const e of encs) {
       const resp = Array.isArray(e.respuestas) ? e.respuestas : [];
-      csv += [e.fecha, e.trimestre, e.tipoRespondente, csvCampo(e.curso),
+      csv += [e.fecha, e.trimestre, e.tipoRespondente, csvCampo(e.curso), e.metodo || 'directo',
         String(e.puntuacion).replace('.', ','),
         ...[0, 1, 2, 3, 4, 5].map(i => resp[i] ?? ''),
         csvCampo(e.comentario)].join(';') + '\n';
@@ -3443,6 +3819,10 @@ window.addEventListener('afterprint', () => {
   if (document.body.classList.contains('informe-abierto')) {
     document.body.classList.remove('informe-abierto');
     $('hoja-informe').innerHTML = '';
+  }
+  if (document.body.classList.contains('formulario-abierto')) {
+    document.body.classList.remove('formulario-abierto');
+    $('hoja-formulario').innerHTML = '';
   }
 });
 

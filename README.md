@@ -194,6 +194,14 @@ create table usuarios (
    incidencias navegable por fecha, cruce ocupación × incidencias por zona con
    lectura automática, medias por pregunta de las encuestas, exportación CSV del
    panel del centro, ids únicos, escapado de textos libres.
-10. Fase 2 (final): Supabase — auth por centro, PostGIS, RLS, vistas agregadas
+10. ✅ **Pase de encuestas por kiosco y papel:** modo kiosco a pantalla completa
+    (el dispositivo pasa de mano en mano; contador visible; cerrar requiere
+    pulsación mantenida) y formulario de papel imprimible con volcado de
+    recuentos por carita (se convierten en filas individuales con medias
+    exactas, marcadas `metodo:'papel'`). Anti dobles envíos: cada pase queda
+    registrado como **sesión por curso y trimestre** (la encuesta es anónima,
+    así que el control es por curso, no por persona); al repetir curso la app
+    avisa y pide confirmación.
+11. Fase 2 (final): Supabase — auth por centro, PostGIS, RLS, vistas agregadas
    para el rol investigador; sustituir datos demo del panel regional y sincronizar
    dispositivos sin copia manual.
