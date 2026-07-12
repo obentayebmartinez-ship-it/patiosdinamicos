@@ -4,21 +4,39 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Patios Dinámicos · La Rioja</title>
+<meta name="theme-color" content="#232d36">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icono-192.png">
+<link rel="apple-touch-icon" href="icono-192.png">
 
-<!-- Leaflet + Leaflet.draw + Turf (CDN, sin API keys) -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
-
-<!-- Tipografía: Baloo 2 (títulos) + Atkinson Hyperlegible (cuerpo) -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<!-- Leaflet + Leaflet.draw + Turf servidos en local: la app funciona sin internet
+     (solo el fondo del mapa y las búsquedas necesitan conexión) -->
+<link rel="stylesheet" href="lib/leaflet.css">
+<link rel="stylesheet" href="lib/leaflet.draw.css">
+<script src="lib/leaflet.js"></script>
+<script src="lib/leaflet-rotate.js"></script>
+<script src="lib/leaflet.draw.js"></script>
+<script src="lib/turf.min.js"></script>
 
 <style>
+/* Tipografía local: Baloo 2 (variable 400-800, títulos) + Atkinson Hyperlegible (cuerpo) */
+@font-face {
+  font-family: 'Baloo 2'; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url('lib/fonts/baloo2.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('lib/fonts/atkinson-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('lib/fonts/atkinson-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible'; font-style: italic; font-weight: 400; font-display: swap;
+  src: url('lib/fonts/atkinson-400i.woff2') format('woff2');
+}
+
 /* ============================================================
    IDENTIDAD VISUAL — "pintura de patio sobre asfalto"
    Hormigón claro de fondo, asfalto oscuro en paneles, y los
@@ -404,7 +422,10 @@ body.modo-hoy .panel-hoy { display: block; }
     flex-direction: row; overflow-x: auto; overflow-y: hidden;
     padding: 6px 8px; gap: 3px; align-items: center;
   }
-  nav.principal .grupo, nav.principal .pie { display: none; }
+  /* En móvil el botón de perfil sigue accesible; solo se oculta el texto de versión */
+  nav.principal .grupo, nav.principal .version-pie { display: none; }
+  nav.principal .pie { margin: 0; padding: 0 4px; border: none; flex: none; }
+  nav.principal .pie #btn-cambiar-perfil { margin: 0; white-space: nowrap; }
   nav.principal button {
     white-space: nowrap; width: auto; flex: none;
     border-left: none; border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0;
@@ -548,6 +569,32 @@ body.modo-hoy .panel-hoy { display: block; }
 .pie-dias { display: flex; gap: 4px; margin-top: 4px; }
 .pie-dias span { flex: 1; text-align: center; font-size: 10px; color: var(--tinta-suave); }
 .pie-dias span.hoy { font-weight: 700; color: var(--tinta); }
+
+/* Cruce ocupación × incidencias: dos columnas de barras comparables por zona */
+.fila-cruce {
+  display: grid; grid-template-columns: 150px 1fr 1fr; gap: 8px; align-items: center;
+  margin-top: 8px; font-size: 12.5px;
+}
+.fila-cruce .etiq { display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fila-cruce .punto { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.fila-cruce .celda { display: flex; align-items: center; gap: 6px; }
+.fila-cruce .barra { height: 14px; border-radius: 0 4px 4px 0; min-width: 2px; flex: none; }
+.fila-cruce .num { color: var(--tinta-suave); font-weight: 700; font-size: 12px; }
+.fila-cruce.cabecera { font-size: 11px; color: var(--tinta-suave); font-weight: 700; margin-top: 2px; }
+.chips-lectura { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.chips-lectura span {
+  font-size: 12px; background: var(--hormigon); border-radius: 999px; padding: 4px 11px;
+}
+
+/* Encuestas por pregunta: la pregunta puede ocupar dos líneas */
+.fila-pregunta {
+  display: grid; grid-template-columns: 1fr 110px 34px; gap: 8px; align-items: center;
+  margin-top: 8px; font-size: 12.5px;
+}
+.fila-pregunta .pista { height: 14px; display: flex; align-items: center; }
+.fila-pregunta .barra { height: 14px; background: #3e7cb1; border-radius: 0 4px 4px 0; min-width: 2px; }
+.fila-pregunta .num { color: var(--tinta-suave); font-weight: 700; }
+.fila-pregunta .num.flojo { color: var(--aviso); }
 
 /* Gravedad: chips de estado (icono + texto, nunca solo color) */
 .chips-gravedad { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
@@ -727,7 +774,7 @@ body.modo-hoy .panel-hoy { display: block; }
   <button class="solo-admin" data-vista="vista-regional" data-titulo="Panel de investigación regional">🔬 Investigación</button>
   <div class="pie">
     <button id="btn-cambiar-perfil" title="Cambiar de perfil (demostración)">👤 Perfil</button>
-    Piloto 2026-27 · v0.1<br>Orientación educativa de La Rioja
+    <span class="version-pie">Piloto 2026-27 · v0.1<br>Orientación educativa de La Rioja</span>
   </div>
 </nav>
 
@@ -784,13 +831,13 @@ body.modo-hoy .panel-hoy { display: block; }
     </div>
 
     <div class="tarjeta solo-edicion">
-      <h3><span class="paso">3</span> Guardar y compartir</h3>
-      <div class="fila-botones">
-        <button id="btn-guardar" class="boton" disabled>💾 Guardar patio</button>
+      <h3><span class="paso">3</span> Guardado y traspaso</h3>
+      <p class="ayuda">El patio se guarda solo en este dispositivo después de cada cambio: no hay que pulsar nada.</p>
+      <div id="estado-guardado"></div>
+      <div class="fila-botones" style="margin-top:9px;">
         <button id="btn-exportar" class="boton secundario" disabled>Ver GeoJSON</button>
         <button id="btn-importar" class="boton secundario">Importar</button>
       </div>
-      <div id="estado-guardado"></div>
       <div class="fila-botones" style="margin-top:10px;">
         <button id="btn-ejemplo" class="boton secundario pequeno">🎓 Cargar patio de ejemplo</button>
       </div>
@@ -988,14 +1035,35 @@ body.modo-hoy .panel-hoy { display: block; }
 /* eslint-disable */
 'use strict';
 
-/* Aviso no bloqueante (sustituye a alert(), que congelaría la app) */
+/* Escapar texto libre (nombres de zonas, grupos, notas…) antes de meterlo en
+   innerHTML o en SVG: evita que "Pista A<B" rompa el render y previene
+   inyecciones cuando lleguen datos de otros centros con Supabase. */
+function esc(texto) {
+  return String(texto ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/* Aviso no bloqueante (sustituye a alert(), que congelaría la app).
+   Con `accion` = { texto, fn } añade un botón (p. ej. "Deshacer"). */
 let toastTemporizador = null;
-function avisar(mensaje) {
+function avisar(mensaje, accion) {
   const t = document.getElementById('toast');
-  t.textContent = mensaje;
+  if (accion) {
+    t.innerHTML = esc(mensaje) +
+      ` <button id="toast-accion" style="margin-left:10px; background:var(--asfalto-3); color:var(--tiza);
+        border:1px solid rgba(255,255,255,.4); border-radius:999px; padding:3px 12px; cursor:pointer;
+        font-family:var(--fuente-cuerpo); font-weight:700; font-size:12.5px;">${esc(accion.texto)}</button>`;
+    document.getElementById('toast-accion').addEventListener('click', () => {
+      t.style.display = 'none';
+      clearTimeout(toastTemporizador);
+      accion.fn();
+    });
+  } else {
+    t.textContent = mensaje;
+  }
   t.style.display = 'block';
   clearTimeout(toastTemporizador);
-  toastTemporizador = setTimeout(() => { t.style.display = 'none'; }, 4500);
+  toastTemporizador = setTimeout(() => { t.style.display = 'none'; }, accion ? 7000 : 4500);
 }
 
 /* ============================================================
@@ -1060,6 +1128,10 @@ const DataLayer = {
   // Con Supabase el equivalente será el patio_id en cada tabla.
   _clave(tipo) { return `${this.PREFIJO}:${tipo}:${this.patioActivo}`; },
 
+  // Id único. Solo Date.now() colisionaba si dos registros caían en el mismo
+  // milisegundo — y borrar uno borraba todos los que compartían id.
+  _nuevoId(prefijo) { return prefijo + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); },
+
   /* ---- Gestión de patios (un centro puede tener varios: infantil, primaria…) ---- */
   listarPatios() {
     const bruto = localStorage.getItem(this.CLAVE_LISTA);
@@ -1089,7 +1161,7 @@ const DataLayer = {
 
   crearPatio(nombre) {
     const lista = this.listarPatios() || [];
-    const p = { id: 'p' + Date.now(), nombre };
+    const p = { id: this._nuevoId('p'), nombre };
     lista.push(p);
     this._guardarListaPatios(lista);
     return p;
@@ -1163,7 +1235,7 @@ const DataLayer = {
   // Con Supabase: insert/select/delete en la tabla `incidencias` (RLS por centro_id).
   async guardarIncidencia(inc) {
     const lista = await this.listarIncidencias();
-    inc.id = 'i' + Date.now();
+    inc.id = this._nuevoId('i');
     lista.push(inc);
     localStorage.setItem(this._clave('incidencias'), JSON.stringify(lista));
     return { ok: true, id: inc.id };
@@ -1181,12 +1253,20 @@ const DataLayer = {
     return { ok: true };
   },
 
+  // Reinsertar un registro recién borrado (botón "Deshacer" del toast), con su id original
+  async restaurarIncidencia(inc) {
+    const lista = await this.listarIncidencias();
+    lista.push(inc);
+    localStorage.setItem(this._clave('incidencias'), JSON.stringify(lista));
+    return { ok: true };
+  },
+
   // Ocupación de zonas: array de { id, fecha, hora, niveles: { zonaId: 0-3 } }
   // (0 vacía · 1 poca · 2 media · 3 llena). Estimación de grupo, nunca conteo de alumnos.
   // Con Supabase: insert/select/delete en la tabla `ocupaciones` (RLS por centro_id).
   async guardarOcupacion(reg) {
     const lista = await this.listarOcupaciones();
-    reg.id = 'o' + Date.now();
+    reg.id = this._nuevoId('o');
     lista.push(reg);
     localStorage.setItem(this._clave('ocupacion'), JSON.stringify(lista));
     return { ok: true, id: reg.id };
@@ -1204,12 +1284,19 @@ const DataLayer = {
     return { ok: true };
   },
 
+  async restaurarOcupacion(reg) {
+    const lista = await this.listarOcupaciones();
+    lista.push(reg);
+    localStorage.setItem(this._clave('ocupacion'), JSON.stringify(lista));
+    return { ok: true };
+  },
+
   // Encuestas de bienestar: array de { id, fecha, trimestre, tipoRespondente,
   // curso, puntuacion (media 1-5), respuestas (por ítem), comentario }.
   // Con Supabase: insert en `encuestas_bienestar` (anónimo: sin user_id).
   async guardarEncuesta(enc) {
     const lista = await this.listarEncuestas();
-    enc.id = 'e' + Date.now();
+    enc.id = this._nuevoId('e');
     lista.push(enc);
     localStorage.setItem(this._clave('encuestas'), JSON.stringify(lista));
     return { ok: true };
@@ -1393,8 +1480,18 @@ function fijarPerimetro(capa) {
 
 $('btn-dibujar-perimetro').addEventListener('click', () => empezarDibujo('perimetro'));
 
+// Borrado en dos toques (confirm() bloquearía la app)
+let confirmarBorradoPerimetro = null;
 $('btn-borrar-perimetro').addEventListener('click', () => {
-  if (!confirm('¿Borrar el perímetro? Las zonas dibujadas se conservan, pero quedarán sin validar.')) return;
+  const b = $('btn-borrar-perimetro');
+  if (!confirmarBorradoPerimetro) {
+    b.textContent = '¿Seguro? Las zonas quedan sin validar';
+    confirmarBorradoPerimetro = setTimeout(() => { b.textContent = 'Borrar'; confirmarBorradoPerimetro = null; }, 5000);
+    return;
+  }
+  clearTimeout(confirmarBorradoPerimetro);
+  confirmarBorradoPerimetro = null;
+  b.textContent = 'Borrar';
   mapa.removeLayer(perimetroLayer);
   perimetroLayer = null;
   refrescarTodo();
@@ -1416,7 +1513,8 @@ function crearZona(capa, nombre, tipo, color, icono) {
   return z;
 }
 
-function etiquetaZona(z) { return (z.icono ? z.icono + ' ' : '') + z.nombre; }
+// Devuelve HTML seguro: el nombre lo escribe el usuario y va a innerHTML/tooltips
+function etiquetaZona(z) { return (z.icono ? z.icono + ' ' : '') + esc(z.nombre); }
 
 // Etiqueta fija sobre la zona (visible sin pasar el ratón)
 function etiquetarEnMapa(z) {
@@ -1430,7 +1528,21 @@ function borrarZona(id) {
   if (zonaEditandoVertices === id) terminarEdicionVertices();
   mapa.removeLayer(zonas[i].layer);
   zonas.splice(i, 1);
+  limpiarRotacionDeZona(id);
   refrescarTodo();
+}
+
+// Al borrar una zona, sus celdas de la rotación semanal ya no apuntan a nada:
+// se eliminan del guardado (si no, quedaban huérfanas en localStorage para siempre).
+// OJO: solo en el borrado explícito de una zona — nunca en cargas/cambios de patio.
+async function limpiarRotacionDeZona(id) {
+  const rot = await DataLayer.cargarRotacion();
+  if (rot && rot.dias) {
+    let habiaCeldas = false;
+    rot.dias.forEach(d => { if (d[id]) { delete d[id]; habiaCeldas = true; } });
+    if (habiaCeldas) await DataLayer.guardarRotacion(rot);
+  }
+  if (rotacionActual && rotacionActual.dias) rotacionActual.dias.forEach(d => { delete d[id]; });
 }
 
 function borrarTodasLasZonas() {
@@ -1647,7 +1759,7 @@ function pintarListaZonas() {
         ? '<span class="etiqueta ok">✓ dentro</span>'
         : `<span class="etiqueta aviso">⚠ se sale ${v.pctFuera.toFixed(0)}%</span>`;
     }
-    for (const s of v.solapes) etiquetas += `<span class="etiqueta aviso">⚠ solapa: ${s}</span>`;
+    for (const s of v.solapes) etiquetas += `<span class="etiqueta aviso">⚠ solapa: ${esc(s)}</span>`;
 
     div.innerHTML = `
       <div class="linea1">
@@ -1664,8 +1776,17 @@ function pintarListaZonas() {
 
     div.querySelector('[data-accion=vertices]').addEventListener('click', () => alternarEdicionVertices(z.id));
     div.querySelector('[data-accion=props]').addEventListener('click', () => abrirModalZona(z.id));
-    div.querySelector('[data-accion=borrar]').addEventListener('click', () => {
-      if (confirm(`¿Borrar la zona "${z.nombre}"?`)) borrarZona(z.id);
+    // Borrado en dos toques (confirm() bloquearía la app)
+    const btnBorrar = div.querySelector('[data-accion=borrar]');
+    let confirmarBorrado = null;
+    btnBorrar.addEventListener('click', () => {
+      if (!confirmarBorrado) {
+        btnBorrar.textContent = '¿Seguro?';
+        confirmarBorrado = setTimeout(() => { btnBorrar.textContent = 'Borrar'; confirmarBorrado = null; }, 4000);
+        return;
+      }
+      clearTimeout(confirmarBorrado);
+      borrarZona(z.id);
     });
     div.addEventListener('mouseenter', () => z.layer.setStyle({ fillOpacity: 0.6 }));
     div.addEventListener('mouseleave', () => z.layer.setStyle({ fillOpacity: 0.35 }));
@@ -1688,7 +1809,6 @@ function refrescarTodo() {
   $('btn-borrar-perimetro').disabled = !hayPerimetro;
   $('btn-dibujar-zona').disabled = !hayPerimetro;
   $('btn-dividir').disabled = !hayPerimetro;
-  $('btn-guardar').disabled = !hayPerimetro;
   $('btn-exportar').disabled = !hayPerimetro;
   $('btn-modo-hoy').disabled = !hayPerimetro || !zonas.length;
   $('dato-perimetro').innerHTML = hayPerimetro
@@ -1697,7 +1817,39 @@ function refrescarTodo() {
   pintarListaZonas();
   pintarResumen();
   if (modoHoy) pintarVistaHoy();
+  autoguardarPatio();
 }
+
+/* ---------- Autoguardado del patio ----------
+   Cualquier cambio (dibujar, editar vértices, borrar, importar…) pasa por
+   refrescarTodo(), así que se persiste solo, con un pequeño debounce.
+   Antes había un botón "Guardar patio": si se cerraba la pestaña sin
+   pulsarlo, se perdía todo el dibujo. */
+let tempAutoguardado = null;
+function autoguardarPatio() {
+  clearTimeout(tempAutoguardado);
+  tempAutoguardado = setTimeout(async () => {
+    const r = await DataLayer.guardarPatio(patioAGeoJSON());
+    const e = $('estado-guardado');
+    e.className = 'ok';
+    e.textContent = '✓ Guardado automáticamente a las ' +
+      r.fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  }, 600);
+}
+
+// Al arrastrar vértices también se guarda (sin esperar a pulsar "Terminar")
+mapa.on('draw:editvertex', () => autoguardarPatio());
+
+// Volcar un guardado pendiente YA (antes de cambiar de patio o cerrar la pestaña).
+// Ojo: no llamar tras borrar el patio activo o restaurar una copia — el mapa
+// aún muestra el estado anterior y lo machacaría.
+function volcarAutoguardado() {
+  if (!tempAutoguardado) return;
+  clearTimeout(tempAutoguardado);
+  tempAutoguardado = null;
+  DataLayer.guardarPatio(patioAGeoJSON()); // localStorage es síncrono por dentro
+}
+window.addEventListener('beforeunload', volcarAutoguardado);
 
 /* ============================================================
    SERIALIZACIÓN GeoJSON  (formato de guardado / exportación)
@@ -1747,17 +1899,7 @@ function cargarDesdeGeoJSON(fc) {
   refrescarTodo();
 }
 
-/* ---------- Guardar / exportar / importar ---------- */
-$('btn-guardar').addEventListener('click', async () => {
-  terminarEdicionVertices();
-  const r = await DataLayer.guardarPatio(patioAGeoJSON());
-  const e = $('estado-guardado');
-  e.className = 'ok';
-  e.id = 'estado-guardado';
-  e.textContent = '✓ Guardado ' + r.fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) +
-    ' (en este dispositivo; con Supabase se sincronizará entre equipos)';
-});
-
+/* ---------- Exportar / importar ---------- */
 $('btn-exportar').addEventListener('click', () => {
   terminarEdicionVertices();
   $('modal-geojson-titulo').textContent = 'GeoJSON del patio';
@@ -2010,13 +2152,13 @@ async function pintarVistaHoy() {
     const z = zonas[i], rot = filas[i];
     html += `<div class="actividad-hoy" style="border-left-color:${z.color}">
       <div class="zona">${etiquetaZona(z)}</div>
-      <div class="act">${rot.actividad}</div>
-      <div class="grupos">Grupo: ${rot.grupo}</div>
-      ${rot.responsable ? `<div class="grupos">🧑‍🏫 Responsable: ${rot.responsable}</div>` : ''}
+      <div class="act">${esc(rot.actividad)}</div>
+      <div class="grupos">Grupo: ${esc(rot.grupo)}</div>
+      ${rot.responsable ? `<div class="grupos">🧑‍🏫 Responsable: ${esc(rot.responsable)}</div>` : ''}
     </div>`;
     z.layer.unbindTooltip();
     z.layer.bindTooltip(
-      `<div class="tit">${etiquetaZona(z)}</div><div class="act">${rot.actividad} · ${rot.grupo}${rot.responsable ? ' · 🧑‍🏫 ' + rot.responsable : ''}</div>`,
+      `<div class="tit">${etiquetaZona(z)}</div><div class="act">${esc(rot.actividad)} · ${esc(rot.grupo)}${rot.responsable ? ' · 🧑‍🏫 ' + esc(rot.responsable) : ''}</div>`,
       { permanent: true, direction: 'center', className: 'etiqueta-zona' }
     ).openTooltip();
   }
@@ -2170,13 +2312,13 @@ function generarSVGCartel(fondo) {
         rx="${fNombre}" fill="#ffffff" fill-opacity="0.88"/>`;
       svg += `<text x="${cx}" y="${cy + fIcono * 0.25}" text-anchor="middle" font-size="${fIcono}">${z.icono}</text>`;
       svg += `<text x="${cx}" y="${cy + fIcono * 0.55 + fNombre}" text-anchor="middle" font-size="${fNombre}"
-        font-family="Baloo 2, sans-serif" font-weight="700" fill="#26313b">${z.nombre}</text>`;
+        font-family="Baloo 2, sans-serif" font-weight="700" fill="#26313b">${esc(z.nombre)}</text>`;
     } else {
       // Sin icono: solo el nombre, en caja compacta
       svg += `<rect x="${cx - anchoCaja / 2}" y="${cy - fNombre * 1.15}" width="${anchoCaja}" height="${fNombre * 2.3}"
         rx="${fNombre}" fill="#ffffff" fill-opacity="0.88"/>`;
       svg += `<text x="${cx}" y="${cy + fNombre * 0.4}" text-anchor="middle" font-size="${fNombre}"
-        font-family="Baloo 2, sans-serif" font-weight="700" fill="#26313b">${z.nombre}</text>`;
+        font-family="Baloo 2, sans-serif" font-weight="700" fill="#26313b">${esc(z.nombre)}</text>`;
     }
   }
 
@@ -2215,10 +2357,10 @@ async function generarCartel() {
     leyenda += `<div class="leyenda-item" style="border-color:${z.color}">
       ${z.icono ? `<span class="icono">${z.icono}</span>` : ''}
       <div class="textos">
-        <div class="nombre-z">${z.nombre}</div>
-        <div class="act-z">${rot.actividad}</div>
-        <span class="grupo-z" style="background:${z.color}">${rot.grupo}</span>
-        ${rot.responsable ? `<div class="act-z">🧑‍🏫 ${rot.responsable}</div>` : ''}
+        <div class="nombre-z">${esc(z.nombre)}</div>
+        <div class="act-z">${esc(rot.actividad)}</div>
+        <span class="grupo-z" style="background:${z.color}">${esc(rot.grupo)}</span>
+        ${rot.responsable ? `<div class="act-z">🧑‍🏫 ${esc(rot.responsable)}</div>` : ''}
       </div>
     </div>`;
   }
@@ -2296,6 +2438,21 @@ $('btn-ejemplo').addEventListener('click', () => cargarDesdeGeoJSON(PATIO_EJEMPL
    ============================================================ */
 let rotacionActual = null;
 
+/* La tabla de rotación también se guarda sola: antes había un botón "Guardar
+   rotación" y salir de la vista sin pulsarlo perdía los cambios. */
+let tempAutoRot = null;
+function autoguardarRotacion() {
+  clearTimeout(tempAutoRot);
+  const patioAlProgramar = DataLayer.patioActivo;
+  tempAutoRot = setTimeout(async () => {
+    // Si mientras tanto se cambió de patio, no escribir la rotación en el patio equivocado
+    if (!rotacionActual || DataLayer.patioActivo !== patioAlProgramar) return;
+    await DataLayer.guardarRotacion(rotacionActual);
+    const e = $('estado-rotacion');
+    if (e) { e.textContent = '✓ Guardado — la vista de hoy y el cartel ya lo usan'; e.style.color = 'var(--ok)'; }
+  }, 500);
+}
+
 async function pintarRotacion() {
   const cont = $('contenido-rotacion');
   if (!rotacionActual) {
@@ -2311,21 +2468,20 @@ async function pintarRotacion() {
 
   let html = '<h3 style="font-family:var(--fuente-titulo); font-size:15px; margin-bottom:6px;">Grupos del centro</h3><div class="chips-grupos">';
   rotacionActual.grupos.forEach((g, i) => {
-    html += `<span class="chip-grupo">${g}<button data-quitar-grupo="${i}" title="Quitar grupo">✕</button></span>`;
+    html += `<span class="chip-grupo">${esc(g)}<button data-quitar-grupo="${i}" title="Quitar grupo">✕</button></span>`;
   });
   html += '<input id="nuevo-grupo" placeholder="ej. 5º-6º EP"><button class="boton pequeno" id="btn-anadir-grupo">＋ Añadir</button></div>';
 
   html += '<h3 style="font-family:var(--fuente-titulo); font-size:15px; margin:12px 0 6px;">Profesorado voluntario (responsables)</h3>' +
     '<p style="font-size:12.5px; color:var(--tinta-suave); margin-bottom:6px;">Cada actividad puede tener un responsable que la supervisa. Solo nombre de pila o iniciales: aparece en la vista de hoy y en el cartel.</p><div class="chips-grupos">';
   rotacionActual.responsables.forEach((r, i) => {
-    html += `<span class="chip-grupo">🧑‍🏫 ${r}<button data-quitar-resp="${i}" title="Quitar responsable">✕</button></span>`;
+    html += `<span class="chip-grupo">🧑‍🏫 ${esc(r)}<button data-quitar-resp="${i}" title="Quitar responsable">✕</button></span>`;
   });
   html += '<input id="nuevo-responsable" placeholder="ej. Marta"><button class="boton pequeno" id="btn-anadir-responsable">＋ Añadir</button></div>';
 
   html += '<div class="fila-botones" style="margin-bottom:12px;">' +
     '<button class="boton secundario" id="btn-generar-rotacion">🔄 Generar rotación automática</button>' +
-    '<button class="boton" id="btn-guardar-rotacion">💾 Guardar rotación</button>' +
-    '<span id="estado-rotacion" style="font-size:12px; color:var(--tinta-suave); align-self:center;"></span></div>';
+    '<span id="estado-rotacion" style="font-size:12px; color:var(--tinta-suave); align-self:center;">Los cambios se guardan solos en este dispositivo.</span></div>';
 
   html += '<div class="envoltura-tabla"><table class="tabla-rotacion"><thead><tr><th>Zona</th>';
   DIAS_SEMANA.forEach((d, i) => { html += `<th class="${i === diaHoy ? 'hoy' : ''}">${d}${i === diaHoy ? ' · hoy' : ''}</th>`; });
@@ -2340,13 +2496,13 @@ async function pintarRotacion() {
       html += `<td class="${d === diaHoy ? 'hoy' : ''}">
         <select data-dia="${d}" data-zona="${z.id}" data-campo="grupo">
           <option value="">— grupo —</option>
-          ${opciones.map(g => `<option ${g === celda.grupo ? 'selected' : ''}>${g}</option>`).join('')}
+          ${opciones.map(g => `<option ${g === celda.grupo ? 'selected' : ''}>${esc(g)}</option>`).join('')}
         </select>
         <input data-dia="${d}" data-zona="${z.id}" data-campo="actividad" placeholder="Actividad"
-          value="${(celda.actividad || '').replace(/"/g, '&quot;')}">
+          value="${esc(celda.actividad || '')}">
         <select data-dia="${d}" data-zona="${z.id}" data-campo="responsable" title="Responsable (profe voluntario)">
           <option value="">— responsable —</option>
-          ${opcResp.map(r => `<option ${r === celda.responsable ? 'selected' : ''}>${r}</option>`).join('')}
+          ${opcResp.map(r => `<option ${r === celda.responsable ? 'selected' : ''}>${esc(r)}</option>`).join('')}
         </select>
       </td>`;
     }
@@ -2358,12 +2514,14 @@ async function pintarRotacion() {
   cont.querySelectorAll('[data-quitar-grupo]').forEach(b => b.addEventListener('click', () => {
     rotacionActual.grupos.splice(+b.dataset.quitarGrupo, 1);
     pintarRotacion();
+    autoguardarRotacion();
   }));
   $('btn-anadir-grupo').addEventListener('click', () => {
     const v = $('nuevo-grupo').value.trim();
     if (!v) return;
     if (!rotacionActual.grupos.includes(v)) rotacionActual.grupos.push(v);
     pintarRotacion();
+    autoguardarRotacion();
     $('nuevo-grupo') && $('nuevo-grupo').focus();
   });
   $('nuevo-grupo').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-anadir-grupo').click(); });
@@ -2371,12 +2529,14 @@ async function pintarRotacion() {
   cont.querySelectorAll('[data-quitar-resp]').forEach(b => b.addEventListener('click', () => {
     rotacionActual.responsables.splice(+b.dataset.quitarResp, 1);
     pintarRotacion();
+    autoguardarRotacion();
   }));
   $('btn-anadir-responsable').addEventListener('click', () => {
     const v = $('nuevo-responsable').value.trim();
     if (!v) return;
     if (!rotacionActual.responsables.includes(v)) rotacionActual.responsables.push(v);
     pintarRotacion();
+    autoguardarRotacion();
     $('nuevo-responsable') && $('nuevo-responsable').focus();
   });
   $('nuevo-responsable').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-anadir-responsable').click(); });
@@ -2386,6 +2546,7 @@ async function pintarRotacion() {
       const { dia, zona, campo } = el.dataset;
       const c = rotacionActual.dias[dia][zona] || (rotacionActual.dias[dia][zona] = {});
       c[campo] = el.value.trim();
+      autoguardarRotacion();
     });
   });
 
@@ -2404,14 +2565,8 @@ async function pintarRotacion() {
       }
     });
     pintarRotacion();
-    avisar('Rotación generada: cada grupo pasa por todas las zonas durante la semana' + (rs.length ? ' y los responsables van rotando' : '') + '. Revísala y guárdala.');
-  });
-
-  $('btn-guardar-rotacion').addEventListener('click', async () => {
-    await DataLayer.guardarRotacion(rotacionActual);
-    const e = $('estado-rotacion');
-    e.textContent = '✓ Guardada — la vista de hoy y el cartel ya la usan';
-    e.style.color = 'var(--ok)';
+    autoguardarRotacion();
+    avisar('Rotación generada y guardada: cada grupo pasa por todas las zonas durante la semana' + (rs.length ? ' y los responsables van rotando' : '') + '. Revísala y ajústala si hace falta.');
   });
 }
 
@@ -2439,6 +2594,16 @@ let incSel = {};
 
 function fechaISOLocal(d = new Date()) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function sumarDias(iso, delta) {
+  const d = new Date(iso + 'T12:00');
+  d.setDate(d.getDate() + delta);
+  return fechaISOLocal(d);
+}
+
+function fechaBonita(iso) {
+  return new Date(iso + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 // Mini-plano del patio con zonas pulsables (misma proyección que el cartel)
@@ -2481,12 +2646,13 @@ async function pintarIncidencias() {
     return;
   }
   incSel = { zonaId: undefined, zonaNombre: '', tipo: null, curso: null, gravedad: null, franja: franjaPorHora() };
+  fechaListaInc = fechaISOLocal(); // al entrar en la vista, la lista empieza en hoy
   const rot = await DataLayer.cargarRotacion();
   const grupos = (rot && rot.grupos && rot.grupos.length) ? rot.grupos : [...GRUPOS_MOCK];
 
   const botonesTipo = Object.entries(TIPOS_INCIDENCIA).map(([clave, t]) =>
     `<button data-tipo-inc="${clave}"><span class="ic">${t.icono}</span>${t.etiqueta}</button>`).join('');
-  const chipsCurso = grupos.map(g => `<button data-curso="${g}">${g}</button>`).join('');
+  const chipsCurso = grupos.map(g => `<button data-curso="${esc(g)}">${esc(g)}</button>`).join('');
   const botonesGrav = Object.entries(GRAVEDADES).map(([n, etq]) =>
     `<button data-gravedad="${n}" class="grav-${n}">${etq}</button>`).join('');
 
@@ -2576,24 +2742,42 @@ async function pintarIncidencias() {
   pintarListaIncidencias();
 }
 
+// Fecha que se está consultando en la lista (se puede navegar hacia atrás)
+let fechaListaInc = fechaISOLocal();
+
 async function pintarListaIncidencias() {
   const cont = $('lista-incidencias');
-  const hoy = await DataLayer.listarIncidencias(fechaISOLocal());
-  if (!hoy.length) { cont.innerHTML = ''; return; }
-  let html = `<div class="paso-titulo" style="font-family:var(--fuente-titulo);">Registradas hoy: ${hoy.length}</div>`;
-  for (const inc of [...hoy].reverse()) {
+  const esHoy = fechaListaInc === fechaISOLocal();
+  const lista = (await DataLayer.listarIncidencias(fechaListaInc))
+    .slice().sort((a, b) => (a.hora || '').localeCompare(b.hora || ''));
+
+  let html = `<div class="paso-titulo" style="font-family:var(--fuente-titulo); display:flex; align-items:center; gap:8px;">
+    <button class="boton secundario pequeno" id="inc-dia-antes" title="Día anterior">◀</button>
+    <span style="flex:1; text-align:center;">${esHoy ? 'Registradas hoy' : fechaBonita(fechaListaInc)}: ${lista.length}</span>
+    <button class="boton secundario pequeno" id="inc-dia-despues" ${esHoy ? 'disabled' : ''} title="Día siguiente">▶</button>
+  </div>`;
+  if (!lista.length) html += '<p class="ayuda" style="font-size:12.5px; color:var(--tinta-suave); text-align:center;">Sin incidencias ese día.</p>';
+  for (const inc of [...lista].reverse()) {
     const t = TIPOS_INCIDENCIA[inc.tipo] || TIPOS_INCIDENCIA.otro;
     html += `<div class="inc-item" style="border-left-color:${COLOR_GRAVEDAD[inc.gravedad]}">
       <span class="hora">${inc.hora}</span>
-      <div class="detalle"><strong>${t.icono} ${t.etiqueta}</strong> · ${inc.zonaNombre} · ${inc.curso} · ${GRAVEDADES[inc.gravedad]}${inc.franja && FRANJAS[inc.franja] ? ' · ' + FRANJAS[inc.franja] : ''}${inc.nota ? '<br>' + inc.nota : ''}</div>
+      <div class="detalle"><strong>${t.icono} ${t.etiqueta}</strong> · ${esc(inc.zonaNombre)} · ${esc(inc.curso)} · ${GRAVEDADES[inc.gravedad]}${inc.franja && FRANJAS[inc.franja] ? ' · ' + FRANJAS[inc.franja] : ''}${inc.nota ? '<br>' + esc(inc.nota) : ''}</div>
       <button data-borrar-inc="${inc.id}" title="Borrar registro">✕</button>
     </div>`;
   }
   cont.innerHTML = html;
+
+  $('inc-dia-antes').addEventListener('click', () => { fechaListaInc = sumarDias(fechaListaInc, -1); pintarListaIncidencias(); });
+  $('inc-dia-despues').addEventListener('click', () => { fechaListaInc = sumarDias(fechaListaInc, 1); pintarListaIncidencias(); });
+
   cont.querySelectorAll('[data-borrar-inc]').forEach(b => b.addEventListener('click', async () => {
+    const borrada = lista.find(i => i.id === b.dataset.borrarInc);
     await DataLayer.borrarIncidencia(b.dataset.borrarInc);
-    avisar('Registro borrado.');
     pintarListaIncidencias();
+    avisar('Registro borrado.', { texto: 'Deshacer', fn: async () => {
+      await DataLayer.restaurarIncidencia(borrada);
+      pintarListaIncidencias();
+    } });
   }));
 }
 
@@ -2615,7 +2799,7 @@ async function pintarOcupacion() {
 
   const filas = zonas.map(z => `
     <div class="fila-ocupacion">
-      <span class="etiq"><span class="punto" style="background:${z.color}"></span>${z.icono ? z.icono + ' ' : ''}${z.nombre}</span>
+      <span class="etiq"><span class="punto" style="background:${z.color}"></span>${etiquetaZona(z)}</span>
       <div class="niveles" data-zona="${z.id}">
         ${Object.entries(NIVELES_OCUPACION).map(([n, etq]) =>
           `<button data-nivel="${n}"><span class="circulo">${ICONO_NIVEL[n]}</span>${etq}</button>`).join('')}
@@ -2659,7 +2843,7 @@ async function pintarListaOcupaciones() {
   for (const reg of [...hoy].reverse()) {
     const partes = Object.entries(reg.niveles).map(([zid, n]) => {
       const z = zonas.find(x => x.id === zid);
-      return `${z ? z.nombre : '(zona eliminada)'}: <strong>${NIVELES_OCUPACION[n]}</strong>`;
+      return `${z ? esc(z.nombre) : '(zona eliminada)'}: <strong>${NIVELES_OCUPACION[n]}</strong>`;
     }).join(' · ');
     html += `<div class="inc-item" style="border-left-color:#3e7cb1">
       <span class="hora">${reg.hora}</span>
@@ -2669,9 +2853,13 @@ async function pintarListaOcupaciones() {
   }
   cont.innerHTML = html;
   cont.querySelectorAll('[data-borrar-ocup]').forEach(b => b.addEventListener('click', async () => {
+    const borrado = hoy.find(o => o.id === b.dataset.borrarOcup);
     await DataLayer.borrarOcupacion(b.dataset.borrarOcup);
-    avisar('Recuento borrado.');
     pintarListaOcupaciones();
+    avisar('Recuento borrado.', { texto: 'Deshacer', fn: async () => {
+      await DataLayer.restaurarOcupacion(borrado);
+      pintarListaOcupaciones();
+    } });
   }));
 }
 
@@ -2721,7 +2909,7 @@ async function pintarEncuestas() {
   if (esAlumnado) {
     html += `<div>
       <div class="paso-titulo"><span class="paso">1</span> ¿De qué curso eres?</div>
-      <div class="chips-curso" id="chips-curso-enc">${grupos.map(g => `<button data-curso-enc="${g}">${g}</button>`).join('')}</div>
+      <div class="chips-curso" id="chips-curso-enc">${grupos.map(g => `<button data-curso-enc="${esc(g)}">${esc(g)}</button>`).join('')}</div>
     </div>`;
   }
 
@@ -2865,11 +3053,11 @@ async function pintarPanelCentro() {
   let barras = '', tablaZonas = '';
   for (const [nombre, n] of zonasOrden) {
     const z = zonas.find(x => x.nombre === nombre);
-    barras += `<div class="fila-barra" title="${nombre}: ${n} incidencia${n === 1 ? '' : 's'}">
-      <span class="etiq"><span class="punto" style="background:${z ? z.color : 'var(--tinta-suave)'}"></span>${nombre}</span>
+    barras += `<div class="fila-barra" title="${esc(nombre)}: ${n} incidencia${n === 1 ? '' : 's'}">
+      <span class="etiq"><span class="punto" style="background:${z ? z.color : 'var(--tinta-suave)'}"></span>${esc(nombre)}</span>
       <span class="pista"><span class="barra" style="width:${(n / maxZona) * 100}%"></span></span>
       <span class="num">${n}</span></div>`;
-    tablaZonas += `<tr><td>${nombre}</td><td>${n}</td></tr>`;
+    tablaZonas += `<tr><td>${esc(nombre)}</td><td>${n}</td></tr>`;
   }
 
   /* ---- Incidencias por día (14 días, columnas; hoy enfatizado) ---- */
@@ -2901,11 +3089,81 @@ async function pintarPanelCentro() {
     .sort((a, b) => b.pct - a.pct);
   let barrasOcup = '', tablaOcup = '';
   for (const zo of zonasOcup) {
-    barrasOcup += `<div class="fila-barra" title="${zo.nombre}: ocupación media ${zo.pct} % (${zo.n} recuento${zo.n === 1 ? '' : 's'})">
-      <span class="etiq"><span class="punto" style="background:${zo.color}"></span>${zo.nombre}</span>
+    barrasOcup += `<div class="fila-barra" title="${esc(zo.nombre)}: ocupación media ${zo.pct} % (${zo.n} recuento${zo.n === 1 ? '' : 's'})">
+      <span class="etiq"><span class="punto" style="background:${zo.color}"></span>${esc(zo.nombre)}</span>
       <span class="pista"><span class="barra" style="width:${zo.pct}%"></span></span>
       <span class="num">${zo.pct}%</span></div>`;
-    tablaOcup += `<tr><td>${zo.nombre}</td><td>${zo.pct} %</td><td>${zo.n}</td></tr>`;
+    tablaOcup += `<tr><td>${esc(zo.nombre)}</td><td>${zo.pct} %</td><td>${zo.n}</td></tr>`;
+  }
+
+  /* ---- Cruce ocupación × incidencias por zona (la señal para rediseñar el patio) ----
+     Mismas ventanas que arriba: ocupación media de la ventana de recuentos,
+     incidencias de los últimos 7 días. Solo zonas actuales del patio. */
+  const inc7PorZona = {};
+  incs.filter(i => i.fecha >= fechaHaceDias(6)).forEach(i => {
+    if (i.zonaId) inc7PorZona[i.zonaId] = (inc7PorZona[i.zonaId] || 0) + 1;
+  });
+  let cruceHtml = '';
+  if (zonas.length && Object.keys(porZonaOcup).length && incs.length) {
+    const cruce = zonas
+      .map(z => {
+        const acc = porZonaOcup[z.id];
+        return { z, pct: acc ? Math.round(acc.suma / (3 * acc.n) * 100) : null, inc: inc7PorZona[z.id] || 0 };
+      })
+      .filter(c => c.pct !== null || c.inc)
+      .sort((a, b) => b.inc - a.inc || (b.pct || 0) - (a.pct || 0));
+    if (cruce.length) {
+      const maxInc7 = Math.max(...cruce.map(c => c.inc), 1);
+      let filas = `<div class="fila-cruce cabecera"><span></span><span>Ocupación media</span><span>Incidencias · 7 días</span></div>`;
+      let tablaCruce = '';
+      for (const c of cruce) {
+        filas += `<div class="fila-cruce">
+          <span class="etiq"><span class="punto" style="background:${c.z.color}"></span>${esc(c.z.nombre)}</span>
+          <span class="celda">${c.pct === null
+            ? '<span class="num">sin recuentos</span>'
+            : `<span class="barra" style="width:${c.pct * 0.9}%; background:#3e7cb1;"></span><span class="num">${c.pct}%</span>`}</span>
+          <span class="celda"><span class="barra" style="width:${(c.inc / maxInc7) * 90}%; background:#d99206;"></span><span class="num">${c.inc}</span></span>
+        </div>`;
+        tablaCruce += `<tr><td>${esc(c.z.nombre)}</td><td>${c.pct === null ? '—' : c.pct + ' %'}</td><td>${c.inc}</td></tr>`;
+      }
+      // Lectura automática: zonas que piden revisión y zonas que se quedan vacías
+      const calientes = cruce.filter(c => (c.pct || 0) >= 60 && c.inc >= 2);
+      const vacias = cruce.filter(c => c.pct !== null && c.pct <= 25);
+      let lectura = '';
+      if (calientes.length) lectura += calientes.map(c => `<span>🔥 <strong>${esc(c.z.nombre)}</strong>: muy llena y concentra incidencias — ¿dividirla o reforzar la guardia?</span>`).join('');
+      if (vacias.length) lectura += vacias.map(c => `<span>💤 <strong>${esc(c.z.nombre)}</strong>: casi vacía — ¿cambiar la actividad o el grupo?</span>`).join('');
+      cruceHtml = `<div class="grafico-tarjeta">
+        <h4>Ocupación e incidencias por zona</h4>
+        ${filas}
+        ${lectura ? `<div class="chips-lectura">${lectura}</div>` : ''}
+        <details><summary>Ver como tabla</summary><table><tr><th>Zona</th><th>Ocupación media</th><th>Incidencias 7 días</th></tr>${tablaCruce}</table></details>
+      </div>`;
+    }
+  }
+
+  /* ---- Encuestas: media por pregunta (lo accionable: qué ítem flojea) ---- */
+  let encItemsHtml = '';
+  for (const tipo of ['alumnado', 'profesorado']) {
+    const del = encs.filter(e => e.trimestre === tri && e.tipoRespondente === tipo && Array.isArray(e.respuestas));
+    if (!del.length) continue;
+    const items = ITEMS_ENCUESTA[tipo];
+    let filas = '';
+    for (let i = 0; i < items.length; i++) {
+      const valores = del.map(e => e.respuestas[i]).filter(v => typeof v === 'number');
+      if (!valores.length) continue;
+      const media = valores.reduce((s, v) => s + v, 0) / valores.length;
+      const flojo = media < 3;
+      filas += `<div class="fila-pregunta" title="${esc(items[i])}: ${media.toFixed(1).replace('.', ',')}/5 (${valores.length} resp.)">
+        <span>${esc(items[i])}</span>
+        <span class="pista"><span class="barra" style="width:${(media / 5) * 100}%;${flojo ? ' background:#c94f2a;' : ''}"></span></span>
+        <span class="num${flojo ? ' flojo' : ''}">${media.toFixed(1).replace('.', ',')}</span>
+      </div>`;
+    }
+    encItemsHtml += `<div class="grafico-tarjeta">
+      <h4>${tipo === 'alumnado' ? '🧒 Alumnado' : '🧑‍🏫 Profesorado'} · media por pregunta (${tri}, ${del.length} resp.)</h4>
+      ${filas}
+      <p style="font-size:11.5px; color:var(--tinta-suave); margin-top:8px;">Escala 1–5 · en rojo, las preguntas por debajo de 3.</p>
+    </div>`;
   }
 
   /* ---- Tipo y gravedad ---- */
@@ -2955,7 +3213,67 @@ async function pintarPanelCentro() {
         <h4>Por gravedad</h4>
         <div class="chips-gravedad">${chipsGrav}</div>
       </div>
+      ${encItemsHtml}
+    </div>
+    ${cruceHtml}
+    <div class="grafico-tarjeta">
+      <h4>Exportar datos del patio activo</h4>
+      <p style="font-size:12px; color:var(--tinta-suave); margin-bottom:9px;">CSV con punto y coma (se abre directo en Excel/Calc). Útil para la memoria anual del centro.</p>
+      <div class="fila-botones">
+        <button class="boton secundario pequeno" id="csv-incidencias" ${incs.length ? '' : 'disabled'}>⬇️ Incidencias (${incs.length})</button>
+        <button class="boton secundario pequeno" id="csv-ocupacion" ${ocups.length ? '' : 'disabled'}>⬇️ Recuentos (${ocups.length})</button>
+        <button class="boton secundario pequeno" id="csv-encuestas" ${encs.length ? '' : 'disabled'}>⬇️ Encuestas (${encs.length})</button>
+      </div>
     </div>`;
+
+  /* ---- Exportación CSV (mismo estilo que el regional: ;, BOM y coma decimal) ---- */
+  const csvCampo = v => {
+    const s = String(v ?? '');
+    return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const descargarCSV = (nombre, texto) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + texto], { type: 'text/csv;charset=utf-8' }));
+    a.download = nombre + '-' + fechaISOLocal() + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  if (incs.length) $('csv-incidencias').addEventListener('click', () => {
+    let csv = 'fecha;hora;zona;tipo;curso;gravedad;franja;nota\n';
+    for (const i of incs) {
+      csv += [i.fecha, i.hora, csvCampo(i.zonaNombre), (TIPOS_INCIDENCIA[i.tipo] || TIPOS_INCIDENCIA.otro).etiqueta,
+        csvCampo(i.curso), GRAVEDADES[i.gravedad] || i.gravedad, (FRANJAS[i.franja] || i.franja || '').replace(/^[^ ]+ /, ''),
+        csvCampo(i.nota)].join(';') + '\n';
+    }
+    descargarCSV('incidencias', csv);
+    avisar('CSV de incidencias descargado.');
+  });
+
+  if (ocups.length) $('csv-ocupacion').addEventListener('click', () => {
+    let csv = 'fecha;hora;zona;nivel;etiqueta\n';
+    for (const o of ocups) {
+      for (const [zid, n] of Object.entries(o.niveles)) {
+        const z = zonas.find(x => x.id === zid);
+        csv += [o.fecha, o.hora, csvCampo(z ? z.nombre : zid), n, NIVELES_OCUPACION[n]].join(';') + '\n';
+      }
+    }
+    descargarCSV('recuentos-ocupacion', csv);
+    avisar('CSV de recuentos descargado.');
+  });
+
+  if (encs.length) $('csv-encuestas').addEventListener('click', () => {
+    let csv = 'fecha;trimestre;colectivo;curso;media;p1;p2;p3;p4;p5;p6;comentario\n';
+    for (const e of encs) {
+      const resp = Array.isArray(e.respuestas) ? e.respuestas : [];
+      csv += [e.fecha, e.trimestre, e.tipoRespondente, csvCampo(e.curso),
+        String(e.puntuacion).replace('.', ','),
+        ...[0, 1, 2, 3, 4, 5].map(i => resp[i] ?? ''),
+        csvCampo(e.comentario)].join(';') + '\n';
+    }
+    descargarCSV('encuestas-bienestar', csv);
+    avisar('CSV de encuestas descargado.');
+  });
 }
 
 /* ============================================================
@@ -3245,7 +3563,7 @@ let copiaPendiente = null;
 function pintarSelectorPatio() {
   const sel = $('selector-patio');
   sel.innerHTML = patios.map(p =>
-    `<option value="${p.id}" ${p.id === DataLayer.patioActivo ? 'selected' : ''}>${p.nombre}</option>`).join('');
+    `<option value="${p.id}" ${p.id === DataLayer.patioActivo ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('');
   // El último patio no se puede borrar: siempre debe quedar uno
   $('btn-patio-borrar').disabled = patios.length < 2;
 }
@@ -3266,6 +3584,7 @@ async function activarPatio(id) {
 }
 
 $('selector-patio').addEventListener('change', async e => {
+  volcarAutoguardado(); // no perder una edición hecha justo antes de cambiar
   await activarPatio(e.target.value);
   const p = patios.find(x => x.id === e.target.value);
   avisar(`Patio activo: ${p ? p.nombre : e.target.value}. Rotación, incidencias y recuentos ahora son los de este patio.`);
@@ -3312,6 +3631,7 @@ $('btn-patio-borrar').addEventListener('click', async () => {
   clearTimeout(confirmarBorradoPatio);
   confirmarBorradoPatio = null;
   b.textContent = 'Borrar';
+  clearTimeout(tempAutoguardado); tempAutoguardado = null; // que no reviva el patio recién borrado
   const borrado = patios.find(x => x.id === DataLayer.patioActivo);
   DataLayer.borrarPatio(DataLayer.patioActivo);
   patios = DataLayer.listarPatios();
@@ -3353,6 +3673,7 @@ $('btn-copia-cancelar').addEventListener('click', () => {
 
 $('btn-copia-confirmar').addEventListener('click', async () => {
   if (!copiaPendiente) return;
+  clearTimeout(tempAutoguardado); tempAutoguardado = null; // que no machaque la copia recién restaurada
   try {
     DataLayer.importarTodo(copiaPendiente);
     patios = DataLayer.listarPatios();
@@ -3407,13 +3728,16 @@ async function pintarCentros() {
         const fc = JSON.parse(bruto);
         const nZonas = (fc.features || []).filter(f => f.properties && f.properties.rol === 'zona').length;
         const per = (fc.features || []).find(f => f.properties && f.properties.rol === 'perimetro');
-        resumen = `${nZonas} zona${nZonas === 1 ? '' : 's'}` +
-          (per && per.properties.area_m2 ? ` · ${formatearArea(per.properties.area_m2)}` : '');
+        // El autoguardado puede dejar un FeatureCollection vacío: eso sigue siendo "sin dibujar"
+        if (per || nZonas) {
+          resumen = `${nZonas} zona${nZonas === 1 ? '' : 's'}` +
+            (per && per.properties.area_m2 ? ` · ${formatearArea(per.properties.area_m2)}` : '');
+        }
       } catch (e) { /* geojson corrupto: se deja el texto por defecto */ }
     }
     const brutoInc = localStorage.getItem(`${DataLayer.PREFIJO}:incidencias:${p.id}`);
     const inc7 = (brutoInc ? JSON.parse(brutoInc) : []).filter(i => i.fecha >= fechaHaceDias(6)).length;
-    itemsLocales += `<li>🏞️ <strong>${p.nombre}</strong>
+    itemsLocales += `<li>🏞️ <strong>${esc(p.nombre)}</strong>
       <span class="datos">${resumen} · ${inc7} incid. 7 días</span>
       <button class="boton secundario pequeno" data-abrir-patio="${p.id}">Abrir</button></li>`;
   }
@@ -3477,6 +3801,14 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
   const perfilGuardado = localStorage.getItem(CLAVE_PERFIL);
   if (perfilGuardado === 'centro' || perfilGuardado === 'admin') aplicarPerfil(perfilGuardado);
   else $('velo-perfil').classList.add('visible');
+
+  // PWA: instalable y funcional sin conexión (salvo el fondo del mapa y las búsquedas)
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* http sin https: se ignora */ });
+  }
+  if (!navigator.onLine) {
+    avisar('Sin conexión: el fondo del mapa no se verá, pero registrar incidencias, recuentos y encuestas funciona igual.');
+  }
 })();
 </script>
 </body>

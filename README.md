@@ -11,11 +11,21 @@ localStorage. Solo el panel regional usa datos ficticios de demostración.
 
 ## Cómo ejecutarlo
 
-Es un único archivo HTML sin dependencias locales (Leaflet, Leaflet.draw y turf.js
-se cargan desde cdnjs; ortofoto PNOA del IGN y capa Catastro por WMS, sin API key).
+Aplicación estática sin build. Las librerías (Leaflet, Leaflet.draw, leaflet-rotate,
+turf.js) y las fuentes van incluidas en `lib/` — **la app funciona sin internet**;
+solo el fondo del mapa (ortofoto PNOA del IGN, Catastro por WMS, sin API key) y las
+búsquedas necesitan conexión.
 
-- Doble clic en `index.html`, o
-- servidor estático: `npx http-server -p 8123 .`
+- Servidor estático: `python -m http.server 8123` (o `npx http-server -p 8123 .`).
+- Doble clic en `index.html` también funciona (sin service worker).
+
+Es una **PWA**: servida por https (o localhost) se puede "instalar" en el móvil
+(menú del navegador → *Añadir a pantalla de inicio*) y abre a pantalla completa,
+incluso sin cobertura en el patio.
+
+**⚠️ Al publicar cualquier cambio** en `index.html` o `lib/`, subir el número de
+`VERSION` en [sw.js](sw.js) — si no, los dispositivos con la app instalada pueden
+tardar en ver la versión nueva.
 
 ## Despliegue estático (sin backend)
 
@@ -178,6 +188,12 @@ create table usuarios (
    buscador de centros con directorio real, capa Catastro, informe regional
    imprimible (guardar como PDF), multi-patio con copia completa para traspaso
    entre dispositivos.
-9. Fase 2 (final): Supabase — auth por centro, PostGIS, RLS, vistas agregadas
+9. ✅ **Robustez pre-Supabase:** PWA instalable y offline (librerías y fuentes en
+   `lib/`, service worker), autoguardado del patio y de la rotación (sin botones
+   de guardar), borrados en dos toques con "Deshacer" en registros, historial de
+   incidencias navegable por fecha, cruce ocupación × incidencias por zona con
+   lectura automática, medias por pregunta de las encuestas, exportación CSV del
+   panel del centro, ids únicos, escapado de textos libres.
+10. Fase 2 (final): Supabase — auth por centro, PostGIS, RLS, vistas agregadas
    para el rol investigador; sustituir datos demo del panel regional y sincronizar
    dispositivos sin copia manual.
