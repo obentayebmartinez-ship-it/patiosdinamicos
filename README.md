@@ -87,6 +87,17 @@ En el primer inicio de sesión de un centro cuya nube está vacía, la app ofrec
 "⬆️ Subir este dispositivo" para volcar todo lo local (este es el traspaso que
 antes se hacía con la copia completa).
 
+### Solicitudes de cuenta
+
+En el cuadro de acceso, un centro interesado puede pulsar **"Solicitar una
+cuenta"** y rellenar un formulario (centro, contacto, correo, mensaje). La
+petición se guarda en la tabla `solicitudes_cuenta` — cualquiera puede crearla
+sin estar autenticado, pero solo el rol admin puede leerla. El admin las ve en
+la vista **🗂️ Centros** ("Solicitudes de cuenta pendientes"), crea la cuenta a
+mano (Authentication → Users + inserts de `centros`/`usuarios`) y pulsa
+**✓ Atendida**. El rol admin (orientación regional) es el panel de investigación
+privado; los centros solo usan su propia cuenta.
+
 ### Esquema y decisiones
 
 - El esquema vive en [supabase/schema.sql](supabase/schema.sql): `centros`,

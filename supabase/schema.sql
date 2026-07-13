@@ -108,6 +108,19 @@ create table if not exists sesiones_encuesta (
   primary key (centro_id, id)
 );
 
+-- Solicitudes de cuenta: un centro interesado rellena el formulario del
+-- login (sin estar autenticado) y la solicitud queda aquí para que
+-- orientación (admin) la revise y cree la cuenta a mano.
+create table if not exists solicitudes_cuenta (
+  id       uuid primary key default gen_random_uuid(),
+  centro   text not null,
+  contacto text,
+  email    text not null,
+  mensaje  text,
+  atendida boolean not null default false,
+  creada   timestamptz not null default now()
+);
+
 -- ------------------------------------------------------------
 -- Funciones auxiliares para las políticas.
 -- SECURITY DEFINER: leen `usuarios` sin pasar por su propio RLS
@@ -128,6 +141,7 @@ $$ select coalesce((select rol = 'admin' from usuarios where id = auth.uid()), f
 
 alter table centros           enable row level security;
 alter table usuarios          enable row level security;
+alter table solicitudes_cuenta enable row level security;
 alter table patios            enable row level security;
 alter table incidencias       enable row level security;
 alter table ocupaciones       enable row level security;
@@ -139,6 +153,20 @@ alter table sesiones_encuesta enable row level security;
 drop policy if exists usuarios_leer_mi_fila on usuarios;
 create policy usuarios_leer_mi_fila on usuarios
   for select using (id = auth.uid());
+
+-- solicitudes_cuenta: cualquiera (incluido anónimo, desde el login) puede
+-- CREAR una solicitud; solo el admin puede leerlas y marcarlas atendidas.
+grant insert on solicitudes_cuenta to anon, authenticated;
+grant select, update on solicitudes_cuenta to authenticated;
+drop policy if exists solicitudes_insert on solicitudes_cuenta;
+create policy solicitudes_insert on solicitudes_cuenta
+  for insert with check (true);
+drop policy if exists solicitudes_admin_select on solicitudes_cuenta;
+create policy solicitudes_admin_select on solicitudes_cuenta
+  for select using (soy_admin());
+drop policy if exists solicitudes_admin_update on solicitudes_cuenta;
+create policy solicitudes_admin_update on solicitudes_cuenta
+  for update using (soy_admin()) with check (soy_admin());
 
 -- centros: un centro ve su ficha; el admin las ve todas y las gestiona.
 drop policy if exists centros_select on centros;

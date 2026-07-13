@@ -327,16 +327,24 @@ aside.herramientas {
 /* Formulario de acceso a la nube (modal de inicio y tarjeta del editor) */
 .campo-nube { margin-top: 8px; }
 .campo-nube label { display: block; font-size: 12px; font-weight: 700; color: var(--tinta-suave); margin-bottom: 3px; }
-.campo-nube input {
+.campo-nube input, .campo-nube textarea {
   width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1.5px solid var(--hormigon-2);
   border-radius: 8px; font-family: var(--fuente-cuerpo); font-size: 14px; background: var(--tiza); color: var(--tinta);
 }
+.campo-nube textarea { min-height: 62px; resize: vertical; }
+.campo-nube textarea:focus { outline: 2px solid var(--asfalto); outline-offset: 1px; border-color: var(--asfalto); }
 .login-error { color: #c94f2a; font-size: 12.5px; margin-top: 8px; min-height: 1px; }
 button.enlace {
   background: none; border: none; color: var(--asfalto); font-family: var(--fuente-cuerpo);
   font-weight: 700; font-size: 13px; cursor: pointer; padding: 2px; text-decoration: underline;
 }
 .pie-nube-cuenta { font-size: 12.5px; color: var(--tinta-suave); margin-top: 4px; }
+.solicitud-fila {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 0; border-top: 1px solid var(--hormigon-2); font-size: 13px;
+}
+.solicitud-fila:first-of-type { border-top: none; }
+.solicitud-fila button { flex: none; }
 .modal textarea { font-family: ui-monospace, monospace; font-size: 11.5px; min-height: 220px; }
 .modal .pie-modal { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 .selector-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 4px; }
@@ -1069,8 +1077,8 @@ body.modo-hoy .panel-hoy { display: block; }
     <div id="bienvenida-login">
       <h2>Patios Dinámicos · La Rioja</h2>
       <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:6px;">
-        Entra con la cuenta de tu <strong>centro</strong> (o la de <strong>orientación regional</strong>).
-        Te la facilita el equipo de orientación educativa.
+        Entra con la cuenta de tu <strong>centro</strong> para organizar el patio hacia la inclusión:
+        zonas, rotaciones, incidencias, ocupación y encuestas de bienestar.
       </p>
       <div class="campo-nube">
         <label for="login-email">Correo</label>
@@ -1084,19 +1092,46 @@ body.modo-hoy .panel-hoy { display: block; }
       <div style="margin-top:14px;">
         <button class="boton" id="btn-login-entrar" style="width:100%;">Entrar</button>
       </div>
-      <p style="font-size:12.5px; color:var(--tinta-suave); text-align:center; margin-top:16px;">
-        ¿Todavía sin cuenta? <button class="enlace" id="btn-ver-demo">Explorar en modo demostración</button>
+      <p style="font-size:13px; color:var(--tinta-suave); text-align:center; margin-top:16px;">
+        ¿Tu centro quiere participar? <button class="enlace" id="btn-ver-solicitud">Solicitar una cuenta</button>
+      </p>
+      <p style="font-size:12px; color:var(--tinta-suave); text-align:center; margin-top:4px;">
+        o <button class="enlace" id="btn-ver-demo">explorar en modo demostración</button>
+      </p>
+    </div>
+    <!-- Solicitar una cuenta -->
+    <div id="bienvenida-solicitud" style="display:none;">
+      <h2>Solicitar una cuenta</h2>
+      <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:6px;">
+        Cuéntanos de tu centro y te crearemos una cuenta para participar en el programa de patios dinámicos.
+        Te responderemos al correo que nos dejes.
+      </p>
+      <div class="campo-nube"><label for="sol-centro">Centro *</label>
+        <input type="text" id="sol-centro" maxlength="90" placeholder="ej. CEIP San Prudencio (Logroño)"></div>
+      <div class="campo-nube"><label for="sol-contacto">Persona de contacto</label>
+        <input type="text" id="sol-contacto" maxlength="90" placeholder="nombre y cargo"></div>
+      <div class="campo-nube"><label for="sol-email">Correo de contacto *</label>
+        <input type="email" id="sol-email" placeholder="tu@centro.org"></div>
+      <div class="campo-nube"><label for="sol-mensaje">Mensaje (opcional)</label>
+        <textarea id="sol-mensaje" maxlength="500" placeholder="¿algo que quieras contarnos?"></textarea></div>
+      <div class="login-error" id="sol-error"></div>
+      <div style="margin-top:14px;">
+        <button class="boton" id="btn-sol-enviar" style="width:100%;">Enviar solicitud</button>
+      </div>
+      <p style="text-align:center; margin-top:14px;">
+        <button class="enlace" id="btn-sol-volver">← Volver a entrar</button>
       </p>
     </div>
     <!-- Modo demostración (secundario) -->
     <div id="bienvenida-demo" style="display:none;">
       <h2>Modo demostración</h2>
       <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:8px;">
-        Sin cuenta: los datos se guardan <strong>solo en este dispositivo</strong>. Elige qué vista quieres explorar.
+        Sin cuenta: los datos se guardan <strong>solo en este dispositivo</strong> y no se envían a ningún sitio.
+        Ideal para probar la app antes de solicitar una cuenta.
       </p>
       <div class="botonera-grande" style="grid-template-columns:1fr 1fr;">
         <button id="perfil-eleccion-centro"><span class="ic">🏫</span>Equipo del centro</button>
-        <button id="perfil-eleccion-admin"><span class="ic">🔬</span>Orientación regional</button>
+        <button id="perfil-eleccion-admin"><span class="ic">🔬</span>Vista regional (demo)</button>
       </div>
       <p style="text-align:center; margin-top:16px;">
         <button class="enlace" id="btn-volver-login">← Volver a entrar con cuenta</button>
@@ -1581,6 +1616,28 @@ const Nube = {
     try { await this.cliente.auth.signOut(); } catch (e) { /* sin conexión: la sesión local se borra igual */ }
     this.usuario = this.centro = this.email = null;
     localStorage.removeItem(this.CLAVE_CUENTA);
+  },
+
+  // Solicitud de cuenta desde el login (sin sesión): la crea cualquiera,
+  // la lee/gestiona solo el admin (tabla solicitudes_cuenta con su RLS).
+  async enviarSolicitud({ centro, contacto, email, mensaje }) {
+    if (!this.cliente) throw new Error('La nube no está configurada en esta instalación.');
+    if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
+    const { error } = await this.cliente.from('solicitudes_cuenta')
+      .insert({ centro, contacto: contacto || null, email, mensaje: mensaje || null });
+    if (error) throw new Error('No se pudo enviar la solicitud: ' + error.message);
+  },
+
+  async listarSolicitudes() {
+    if (!this.esAdmin() || !this.cliente || !navigator.onLine) return null;
+    const { data, error } = await this.cliente.from('solicitudes_cuenta')
+      .select('*').eq('atendida', false).order('creada', { ascending: false });
+    return error ? null : data;
+  },
+
+  async marcarSolicitud(id) {
+    if (!this.esAdmin()) return;
+    await this.cliente.from('solicitudes_cuenta').update({ atendida: true }).eq('id', id);
   },
 
   // Cambiar el nombre del propio centro (rol centro). Requiere la política
@@ -4628,6 +4685,28 @@ function loginDesdeModal() {
   procesarLogin({ emailEl: 'login-email', claveEl: 'login-clave', btn: $('btn-login-entrar'), errEl: 'login-error' });
 }
 
+// Enviar una solicitud de cuenta (formulario del login)
+async function enviarSolicitudCuenta() {
+  const centro = $('sol-centro').value.trim();
+  const email = $('sol-email').value.trim();
+  const contacto = $('sol-contacto').value.trim();
+  const mensaje = $('sol-mensaje').value.trim();
+  $('sol-error').textContent = '';
+  if (!centro || !email) { $('sol-error').textContent = 'El centro y el correo son obligatorios.'; return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { $('sol-error').textContent = 'Escribe un correo válido.'; return; }
+  const b = $('btn-sol-enviar');
+  b.disabled = true; b.textContent = 'Enviando…';
+  try {
+    await Nube.enviarSolicitud({ centro, contacto, email, mensaje });
+    ['sol-centro', 'sol-contacto', 'sol-email', 'sol-mensaje'].forEach(id => $(id).value = '');
+    mostrarVistaInicio('login');
+    avisar('Solicitud enviada. Te contactaremos por correo. ¡Gracias!');
+  } catch (err) {
+    $('sol-error').textContent = err.message;
+  }
+  b.disabled = false; b.textContent = 'Enviar solicitud';
+}
+
 // Acceso por cuenta, compartido por el modal de inicio y la tarjeta del editor
 async function procesarLogin({ emailEl, claveEl, btn, errEl }) {
   const email = ($(emailEl).value || '').trim();
@@ -4711,20 +4790,28 @@ function aplicarPerfil(p) {
   $('velo-perfil').classList.remove('visible');
 }
 
-// Abre el modal de inicio en la vista adecuada: acceso por cuenta si la nube
-// está configurada; si no, directamente el modo demostración.
+// Cambia entre las sub-vistas del modal de inicio: 'login' | 'solicitud' | 'demo'
+function mostrarVistaInicio(cual) {
+  $('bienvenida-login').style.display = cual === 'login' ? 'block' : 'none';
+  $('bienvenida-solicitud').style.display = cual === 'solicitud' ? 'block' : 'none';
+  $('bienvenida-demo').style.display = cual === 'demo' ? 'block' : 'none';
+}
+
+// Abre el modal de inicio: acceso por cuenta si la nube está configurada;
+// si no, directamente el modo demostración.
 function abrirModalInicio() {
-  const hayNube = Nube.disponible();
-  $('bienvenida-login').style.display = hayNube ? 'block' : 'none';
-  $('bienvenida-demo').style.display = hayNube ? 'none' : 'block';
+  mostrarVistaInicio(Nube.disponible() ? 'login' : 'demo');
   $('login-error').textContent = '';
   $('velo-perfil').classList.add('visible');
 }
 
 $('btn-login-entrar').addEventListener('click', loginDesdeModal);
 $('login-clave').addEventListener('keydown', e => { if (e.key === 'Enter') loginDesdeModal(); });
-$('btn-ver-demo').addEventListener('click', () => { $('bienvenida-login').style.display = 'none'; $('bienvenida-demo').style.display = 'block'; });
-$('btn-volver-login').addEventListener('click', () => { $('bienvenida-demo').style.display = 'none'; $('bienvenida-login').style.display = 'block'; });
+$('btn-ver-demo').addEventListener('click', () => mostrarVistaInicio('demo'));
+$('btn-ver-solicitud').addEventListener('click', () => { $('sol-error').textContent = ''; mostrarVistaInicio('solicitud'); });
+$('btn-sol-volver').addEventListener('click', () => mostrarVistaInicio('login'));
+$('btn-volver-login').addEventListener('click', () => mostrarVistaInicio('login'));
+$('btn-sol-enviar').addEventListener('click', enviarSolicitudCuenta);
 $('perfil-eleccion-centro').addEventListener('click', () => aplicarPerfil('centro'));
 $('perfil-eleccion-admin').addEventListener('click', () => aplicarPerfil('admin'));
 $('btn-cambiar-perfil').addEventListener('click', abrirModalInicio);
@@ -4758,6 +4845,26 @@ async function pintarCentros() {
   const hayReales = !!(dReg && dReg.centros.length);
   if ($('aviso-centros')) $('aviso-centros').style.display = hayReales ? 'none' : '';
 
+  // Solicitudes de cuenta pendientes (solo admin)
+  const solicitudes = Nube.esAdmin() ? await Nube.listarSolicitudes() : null;
+  let bloqueSolicitudes = '';
+  if (solicitudes && solicitudes.length) {
+    const filas = solicitudes.map(s => `<div class="solicitud-fila">
+      <div>
+        <strong>${esc(s.centro)}</strong>
+        <span class="datos"> · <a href="mailto:${esc(s.email)}">${esc(s.email)}</a>${s.contacto ? ' · ' + esc(s.contacto) : ''}</span>
+        ${s.mensaje ? `<div class="datos" style="margin-top:2px;">“${esc(s.mensaje)}”</div>` : ''}
+        <div class="datos">${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+      </div>
+      <button class="boton secundario pequeno" data-atender="${s.id}">✓ Atendida</button>
+    </div>`).join('');
+    bloqueSolicitudes = `<div class="tarjeta" style="border-left:4px solid var(--z-cognitiva); margin-bottom:14px;">
+      <h4 style="margin-bottom:8px;">✉️ Solicitudes de cuenta pendientes (${solicitudes.length})</h4>
+      <p class="ayuda" style="margin-bottom:8px;">Crea la cuenta en Supabase (Authentication → Users) y da de alta el centro; luego marca la solicitud como atendida.</p>
+      ${filas}
+    </div>`;
+  }
+
   // Patios reales de este dispositivo
   let itemsLocales = '';
   for (const p of (DataLayer.listarPatios() || [])) {
@@ -4782,7 +4889,7 @@ async function pintarCentros() {
       <button class="boton secundario pequeno" data-abrir-patio="${p.id}">Abrir</button></li>`;
   }
 
-  let html = `<div class="rejilla-centros">
+  let html = bloqueSolicitudes + `<div class="rejilla-centros">
     <div class="tarjeta tarjeta-centro" style="border-left-color:var(--ok)">
       <div class="cabecera-tc"><h4>🏫 Este centro</h4><span class="insignia local">este dispositivo</span></div>
       <ul>${itemsLocales || '<li><span class="datos">Sin patios definidos.</span></li>'}</ul>
@@ -4829,6 +4936,13 @@ async function pintarCentros() {
   cont.querySelectorAll('[data-abrir-patio]').forEach(b => b.addEventListener('click', async () => {
     await activarPatio(b.dataset.abrirPatio);
     document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
+  }));
+
+  cont.querySelectorAll('[data-atender]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    await Nube.marcarSolicitud(b.dataset.atender);
+    avisar('Solicitud marcada como atendida.');
+    pintarCentros();
   }));
 }
 
