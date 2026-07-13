@@ -4607,6 +4607,7 @@ function pintarNube() {
     await Nube.salir();
     pintarNube();
     pintarCabeceraCentro();
+    abrirModalInicio(); // volver a la pantalla grande de acceso
     avisar('Sesión cerrada. Los datos guardados en este dispositivo se conservan.');
   });
 }
