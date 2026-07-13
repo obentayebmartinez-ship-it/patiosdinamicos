@@ -316,10 +316,27 @@ aside.herramientas {
 }
 .modal h2 { font-family: var(--fuente-titulo); font-size: 19px; margin-bottom: 14px; }
 .modal label { display: block; font-size: 12.5px; font-weight: 700; margin: 12px 0 4px; }
-.modal input[type=text], .modal select, .modal textarea, .modal input[type=number] {
-  width: 100%; padding: 8px 10px; border: 1.5px solid var(--hormigon-2);
-  border-radius: 8px; font-family: var(--fuente-cuerpo); font-size: 13.5px;
+.modal input[type=text], .modal input[type=email], .modal input[type=password],
+.modal select, .modal textarea, .modal input[type=number] {
+  width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1.5px solid var(--hormigon-2);
+  border-radius: 8px; font-family: var(--fuente-cuerpo); font-size: 14px; background: var(--tiza); color: var(--tinta);
 }
+.modal input:focus, .modal select:focus, .modal textarea:focus,
+.campo-nube input:focus { outline: 2px solid var(--asfalto); outline-offset: 1px; border-color: var(--asfalto); }
+
+/* Formulario de acceso a la nube (modal de inicio y tarjeta del editor) */
+.campo-nube { margin-top: 8px; }
+.campo-nube label { display: block; font-size: 12px; font-weight: 700; color: var(--tinta-suave); margin-bottom: 3px; }
+.campo-nube input {
+  width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1.5px solid var(--hormigon-2);
+  border-radius: 8px; font-family: var(--fuente-cuerpo); font-size: 14px; background: var(--tiza); color: var(--tinta);
+}
+.login-error { color: #c94f2a; font-size: 12.5px; margin-top: 8px; min-height: 1px; }
+button.enlace {
+  background: none; border: none; color: var(--asfalto); font-family: var(--fuente-cuerpo);
+  font-weight: 700; font-size: 13px; cursor: pointer; padding: 2px; text-decoration: underline;
+}
+.pie-nube-cuenta { font-size: 12.5px; color: var(--tinta-suave); margin-top: 4px; }
 .modal textarea { font-family: ui-monospace, monospace; font-size: 11.5px; min-height: 220px; }
 .modal .pie-modal { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 .selector-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 4px; }
@@ -833,7 +850,7 @@ body.modo-hoy .panel-hoy { display: block; }
 <!-- ===================== Cabecera ===================== -->
 <header class="cabecera">
   <h1 id="titulo-vista">Configurador de patio</h1>
-  <span class="centro-activo">🏫 CEIP Valdemontes (Logroño) · centro de demostración</span>
+  <span class="centro-activo" id="centro-activo">🏫 Modo local · datos solo en este dispositivo</span>
 </header>
 
 <!-- ===================== Navegación ===================== -->
@@ -849,7 +866,7 @@ body.modo-hoy .panel-hoy { display: block; }
   <button class="solo-admin" data-vista="vista-centros" data-titulo="Centros y patios">🗂️ Centros</button>
   <button class="solo-admin" data-vista="vista-regional" data-titulo="Panel de investigación regional">🔬 Investigación</button>
   <div class="pie">
-    <button id="btn-cambiar-perfil" title="Cambiar de perfil (demostración)">👤 Perfil</button>
+    <button id="btn-cambiar-perfil" title="Entrar con tu cuenta o cambiar de perfil">👤 Entrar</button>
     <span class="version-pie">Piloto 2026-27 · v0.1<br>Orientación educativa de La Rioja</span>
   </div>
 </nav>
@@ -918,7 +935,7 @@ body.modo-hoy .panel-hoy { display: block; }
         <button id="btn-ejemplo" class="boton secundario pequeno">🎓 Cargar patio de ejemplo</button>
       </div>
       <hr style="border:none; border-top:1px solid var(--hormigon-2); margin:12px 0 10px;">
-      <p class="ayuda">Traspaso entre dispositivos (mientras no hay nube): descarga la copia en un equipo y restáurala en otro. Incluye <strong>todos los patios y todos los registros</strong>.</p>
+      <p class="ayuda">Copia de seguridad manual (o traspaso si no usas la cuenta de la nube): descarga la copia en un equipo y restáurala en otro. Incluye <strong>todos los patios y todos los registros</strong>.</p>
       <div class="fila-botones">
         <button id="btn-copia-exportar" class="boton secundario pequeno">📦 Descargar copia completa</button>
         <button id="btn-copia-importar" class="boton secundario pequeno">📥 Restaurar copia</button>
@@ -978,7 +995,7 @@ body.modo-hoy .panel-hoy { display: block; }
 
 <section id="vista-panel-centro" class="vista vista-mock">
   <h2>Panel del centro</h2>
-  <p>Datos reales registrados en la app (incidencias y encuestas de este dispositivo, por ahora). Con Supabase se sumarán todos los dispositivos del centro.</p>
+  <p>Datos registrados en la app. Con la cuenta del centro conectada, se suman todos los dispositivos del centro; sin cuenta, solo los de este dispositivo.</p>
   <div id="contenido-panel"></div>
 </section>
 
@@ -1045,18 +1062,60 @@ body.modo-hoy .panel-hoy { display: block; }
   </div>
 </div>
 
-<!-- ===================== Modal: elección de perfil (demostración) ===================== -->
+<!-- ===================== Modal: bienvenida / acceso ===================== -->
 <div class="velo" id="velo-perfil">
   <div class="modal">
-    <h2>¿Con qué perfil entras?</h2>
-    <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:4px;">
-      Este selector solo cambia lo que se muestra en este dispositivo. Si tu centro ya
-      tiene cuenta de la nube, entra desde la tarjeta <strong>☁️ Nube del centro</strong>
-      del editor: el perfil se ajusta solo y los datos se sincronizan.
-    </p>
-    <div class="botonera-grande" style="grid-template-columns:1fr 1fr; margin-top:10px;">
-      <button id="perfil-eleccion-centro"><span class="ic">🏫</span>Equipo del centro</button>
-      <button id="perfil-eleccion-admin"><span class="ic">🔬</span>Orientación regional (admin)</button>
+    <!-- Acceso por cuenta (principal) -->
+    <div id="bienvenida-login">
+      <h2>Patios Dinámicos · La Rioja</h2>
+      <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:6px;">
+        Entra con la cuenta de tu <strong>centro</strong> (o la de <strong>orientación regional</strong>).
+        Te la facilita el equipo de orientación educativa.
+      </p>
+      <div class="campo-nube">
+        <label for="login-email">Correo</label>
+        <input type="email" id="login-email" autocomplete="username" placeholder="centro@ejemplo.org">
+      </div>
+      <div class="campo-nube">
+        <label for="login-clave">Contraseña</label>
+        <input type="password" id="login-clave" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <div style="margin-top:14px;">
+        <button class="boton" id="btn-login-entrar" style="width:100%;">Entrar</button>
+      </div>
+      <p style="font-size:12.5px; color:var(--tinta-suave); text-align:center; margin-top:16px;">
+        ¿Todavía sin cuenta? <button class="enlace" id="btn-ver-demo">Explorar en modo demostración</button>
+      </p>
+    </div>
+    <!-- Modo demostración (secundario) -->
+    <div id="bienvenida-demo" style="display:none;">
+      <h2>Modo demostración</h2>
+      <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:8px;">
+        Sin cuenta: los datos se guardan <strong>solo en este dispositivo</strong>. Elige qué vista quieres explorar.
+      </p>
+      <div class="botonera-grande" style="grid-template-columns:1fr 1fr;">
+        <button id="perfil-eleccion-centro"><span class="ic">🏫</span>Equipo del centro</button>
+        <button id="perfil-eleccion-admin"><span class="ic">🔬</span>Orientación regional</button>
+      </div>
+      <p style="text-align:center; margin-top:16px;">
+        <button class="enlace" id="btn-volver-login">← Volver a entrar con cuenta</button>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Modal: nombre del centro ===================== -->
+<div class="velo" id="velo-nombre-centro">
+  <div class="modal">
+    <h2>Nombre del centro</h2>
+    <p style="font-size:12.5px; color:var(--tinta-suave);">Aparece en la cabecera de la app y en el panel de orientación regional.</p>
+    <label>Nombre</label>
+    <input type="text" id="nombre-centro-input" maxlength="80" placeholder="ej. CEIP San Prudencio">
+    <div class="login-error" id="nombre-centro-error"></div>
+    <div class="pie-modal">
+      <button class="boton secundario" id="nombre-centro-cancelar">Cancelar</button>
+      <button class="boton" id="nombre-centro-guardar">Guardar</button>
     </div>
   </div>
 </div>
@@ -1522,6 +1581,18 @@ const Nube = {
     try { await this.cliente.auth.signOut(); } catch (e) { /* sin conexión: la sesión local se borra igual */ }
     this.usuario = this.centro = this.email = null;
     localStorage.removeItem(this.CLAVE_CUENTA);
+  },
+
+  // Cambiar el nombre del propio centro (rol centro). Requiere la política
+  // RLS `centros_update_propio` del schema.sql.
+  async renombrarCentro(nombre) {
+    if (!this.esCentro()) throw new Error('Solo la cuenta de un centro puede cambiar su nombre.');
+    if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
+    const { error } = await this.cliente.from('centros').update({ nombre }).eq('id', this.usuario.centro_id);
+    if (error) throw new Error('No se pudo guardar. Puede faltar la política RLS "centros_update_propio" en Supabase. (' + error.message + ')');
+    this.centro = { ...(this.centro || { id: this.usuario.centro_id }), nombre };
+    localStorage.setItem(this.CLAVE_CUENTA, JSON.stringify({ usuario: this.usuario, centro: this.centro }));
+    this._cacheRegional = null; // que el panel regional recoja el nuevo nombre
   },
 
   // Carga la fila de `usuarios` (rol + centro). Si no hay conexión,
@@ -4480,14 +4551,14 @@ function pintarNube() {
     cont.innerHTML = `
       <p class="ayuda">Con la cuenta del centro, todo lo que se registra aquí se guarda también en la nube
         y todos los dispositivos del centro ven lo mismo. La cuenta la facilita orientación regional.</p>
-      <label style="font-size:12px; font-weight:700; color:var(--tinta-suave);">Correo</label>
-      <input type="email" id="nube-email" autocomplete="username" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
-      <label style="font-size:12px; font-weight:700; color:var(--tinta-suave);">Contraseña</label>
-      <input type="password" id="nube-clave" autocomplete="current-password" style="width:100%; box-sizing:border-box;">
-      <div class="fila-botones" style="margin-top:9px;">
+      <div class="campo-nube"><label for="nube-email">Correo</label>
+        <input type="email" id="nube-email" autocomplete="username" placeholder="centro@ejemplo.org"></div>
+      <div class="campo-nube"><label for="nube-clave">Contraseña</label>
+        <input type="password" id="nube-clave" autocomplete="current-password"></div>
+      <div class="login-error" id="nube-error"></div>
+      <div class="fila-botones" style="margin-top:11px;">
         <button id="btn-nube-entrar" class="boton pequeno">Entrar</button>
-      </div>
-      <div id="nube-error" style="color:#c94f2a; font-size:12.5px; margin-top:6px;"></div>`;
+      </div>`;
     $('btn-nube-entrar').addEventListener('click', entrarNube);
     $('nube-clave').addEventListener('keydown', e => { if (e.key === 'Enter') entrarNube(); });
     return;
@@ -4496,16 +4567,18 @@ function pintarNube() {
   const pend = Nube._outbox().length;
   const quien = Nube.centro ? esc(Nube.centro.nombre) : (Nube.esAdmin() ? 'orientación regional' : 'sin centro asignado');
   cont.innerHTML = `
-    <p class="ayuda">Conectado como <strong>${esc(Nube.email || '')}</strong> · ${quien}.</p>
-    <div class="ayuda" id="nube-estado">${pend ? `⏳ ${pend} cambio${pend === 1 ? '' : 's'} pendiente${pend === 1 ? '' : 's'} de subir` : '✅ Todo sincronizado'}</div>
+    <p class="pie-nube-cuenta">Conectado como <strong>${esc(Nube.email || '')}</strong><br>${quien}.</p>
+    <div class="ayuda" id="nube-estado" style="margin-top:6px;">${pend ? `⏳ ${pend} cambio${pend === 1 ? '' : 's'} pendiente${pend === 1 ? '' : 's'} de subir` : '✅ Todo sincronizado'}</div>
     <div class="fila-botones" style="margin-top:9px; flex-wrap:wrap;">
       ${Nube.esCentro() ? `
         <button id="btn-nube-sync" class="boton secundario pequeno">🔄 Sincronizar ahora</button>
+        <button id="btn-nube-nombre" class="boton secundario pequeno">✏️ Nombre del centro</button>
         <button id="btn-nube-subir" class="boton secundario pequeno" title="Añade a la nube todo lo guardado en este dispositivo">⬆️ Subir este dispositivo</button>` : ''}
       <button id="btn-nube-salir" class="boton secundario pequeno">Salir</button>
     </div>`;
 
   if (Nube.esCentro()) {
+    $('btn-nube-nombre').addEventListener('click', abrirModalNombreCentro);
     $('btn-nube-sync').addEventListener('click', async () => {
       $('btn-nube-sync').disabled = true;
       const r = await Nube.sincronizar();
@@ -4533,6 +4606,7 @@ function pintarNube() {
   $('btn-nube-salir').addEventListener('click', async () => {
     await Nube.salir();
     pintarNube();
+    pintarCabeceraCentro();
     avisar('Sesión cerrada. Los datos guardados en este dispositivo se conservan.');
   });
 }
@@ -4544,29 +4618,42 @@ function ofrecerSubida() {
   });
 }
 
-async function entrarNube() {
-  const email = ($('nube-email').value || '').trim();
-  const clave = $('nube-clave').value;
-  if (!email || !clave) { $('nube-error').textContent = 'Escribe el correo y la contraseña.'; return; }
-  const b = $('btn-nube-entrar');
-  b.disabled = true; b.textContent = 'Entrando…';
+// Login desde la tarjeta ☁️ del editor
+function entrarNube() {
+  procesarLogin({ emailEl: 'nube-email', claveEl: 'nube-clave', btn: $('btn-nube-entrar'), errEl: 'nube-error' });
+}
+// Login desde el modal de inicio
+function loginDesdeModal() {
+  procesarLogin({ emailEl: 'login-email', claveEl: 'login-clave', btn: $('btn-login-entrar'), errEl: 'login-error' });
+}
+
+// Acceso por cuenta, compartido por el modal de inicio y la tarjeta del editor
+async function procesarLogin({ emailEl, claveEl, btn, errEl }) {
+  const email = ($(emailEl).value || '').trim();
+  const clave = $(claveEl).value;
+  if (errEl) $(errEl).textContent = '';
+  if (!email || !clave) { if (errEl) $(errEl).textContent = 'Escribe el correo y la contraseña.'; return; }
+  const textoOrig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Entrando…';
   try {
     await Nube.entrar(email, clave);
-    pintarNube();
+    $('velo-perfil').classList.remove('visible');
     aplicarPerfilNube();
+    pintarNube();
+    pintarCabeceraCentro();
     if (Nube.esCentro()) {
       const r = await Nube.sincronizar({ silencioso: true });
-      pintarNube();
+      pintarNube(); pintarCabeceraCentro();
       if (r === 'vacia') ofrecerSubida();
       else if (r === true) avisar('Cuenta conectada y datos sincronizados.');
       else avisar('Cuenta conectada. La sincronización se completará cuando haya conexión.');
     } else if (Nube.esAdmin()) {
-      avisar('Cuenta de orientación regional conectada: las vistas de la red muestran ya los centros reales.');
+      avisar('Conectado como orientación regional: las vistas de la red muestran los centros reales.');
       Nube.datosRegionales(); // precargar
     }
   } catch (err) {
-    b.disabled = false; b.textContent = 'Entrar';
-    $('nube-error').textContent = err.message;
+    btn.disabled = false; btn.textContent = textoOrig;
+    if (errEl) $(errEl).textContent = err.message; else avisar(err.message);
   }
 }
 
@@ -4574,6 +4661,29 @@ async function entrarNube() {
 function aplicarPerfilNube() {
   if (Nube.esAdmin()) aplicarPerfil('admin');
   else if (Nube.conectada()) aplicarPerfil('centro');
+}
+
+// Cabecera: nombre real del centro conectado (o estado local). También
+// actualiza el botón de cuenta del pie del menú.
+function pintarCabeceraCentro() {
+  const el = $('centro-activo');
+  if (el) {
+    if (Nube.esCentro() && Nube.centro) { el.innerHTML = '🏫 ' + esc(Nube.centro.nombre); el.title = 'Centro conectado a la nube'; }
+    else if (Nube.esAdmin()) { el.innerHTML = '🔬 Orientación regional'; el.title = 'Cuenta de orientación regional'; }
+    else if (Nube.conectada()) { el.innerHTML = '🏫 Cuenta sin centro asignado'; el.title = ''; }
+    else { el.innerHTML = '🏫 Modo local · datos solo en este dispositivo'; el.title = 'Sin cuenta: entra desde 👤 para sincronizar entre dispositivos'; }
+  }
+  const btn = $('btn-cambiar-perfil');
+  if (btn) btn.textContent = Nube.esCentro() && Nube.centro ? '👤 ' + Nube.centro.nombre
+    : Nube.esAdmin() ? '👤 Regional' : '👤 Entrar';
+}
+
+/* ---- Cambiar el nombre del centro (rol centro) ---- */
+function abrirModalNombreCentro() {
+  $('nombre-centro-input').value = (Nube.centro && Nube.centro.nombre) || '';
+  $('nombre-centro-error').textContent = '';
+  $('velo-nombre-centro').classList.add('visible');
+  setTimeout(() => $('nombre-centro-input').focus(), 40);
 }
 
 /* ============================================================
@@ -4589,7 +4699,6 @@ function aplicarPerfil(p) {
   perfilActual = p;
   localStorage.setItem(CLAVE_PERFIL, p);
   document.body.classList.toggle('perfil-centro', p === 'centro');
-  $('btn-cambiar-perfil').textContent = p === 'centro' ? '👤 Equipo del centro · cambiar' : '👤 Orientación regional · cambiar';
   // Si el centro estaba en una vista de admin, volver al editor
   if (p === 'centro') {
     const visible = document.querySelector('.vista.visible');
@@ -4597,12 +4706,46 @@ function aplicarPerfil(p) {
       document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
     }
   }
+  pintarCabeceraCentro();
   $('velo-perfil').classList.remove('visible');
 }
 
+// Abre el modal de inicio en la vista adecuada: acceso por cuenta si la nube
+// está configurada; si no, directamente el modo demostración.
+function abrirModalInicio() {
+  const hayNube = Nube.disponible();
+  $('bienvenida-login').style.display = hayNube ? 'block' : 'none';
+  $('bienvenida-demo').style.display = hayNube ? 'none' : 'block';
+  $('login-error').textContent = '';
+  $('velo-perfil').classList.add('visible');
+}
+
+$('btn-login-entrar').addEventListener('click', loginDesdeModal);
+$('login-clave').addEventListener('keydown', e => { if (e.key === 'Enter') loginDesdeModal(); });
+$('btn-ver-demo').addEventListener('click', () => { $('bienvenida-login').style.display = 'none'; $('bienvenida-demo').style.display = 'block'; });
+$('btn-volver-login').addEventListener('click', () => { $('bienvenida-demo').style.display = 'none'; $('bienvenida-login').style.display = 'block'; });
 $('perfil-eleccion-centro').addEventListener('click', () => aplicarPerfil('centro'));
 $('perfil-eleccion-admin').addEventListener('click', () => aplicarPerfil('admin'));
-$('btn-cambiar-perfil').addEventListener('click', () => $('velo-perfil').classList.add('visible'));
+$('btn-cambiar-perfil').addEventListener('click', abrirModalInicio);
+
+/* ---- Modal: nombre del centro ---- */
+$('nombre-centro-cancelar').addEventListener('click', () => $('velo-nombre-centro').classList.remove('visible'));
+$('nombre-centro-guardar').addEventListener('click', async () => {
+  const nombre = $('nombre-centro-input').value.trim();
+  if (!nombre) { $('nombre-centro-error').textContent = 'El nombre no puede estar vacío.'; return; }
+  const b = $('nombre-centro-guardar');
+  b.disabled = true; b.textContent = 'Guardando…';
+  try {
+    await Nube.renombrarCentro(nombre);
+    $('velo-nombre-centro').classList.remove('visible');
+    pintarCabeceraCentro(); pintarNube();
+    avisar('Nombre del centro actualizado.');
+  } catch (err) {
+    $('nombre-centro-error').textContent = err.message;
+  }
+  b.disabled = false; b.textContent = 'Guardar';
+});
+$('nombre-centro-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('nombre-centro-guardar').click(); });
 
 /* ---- Vista Centros y patios (solo admin) ---- */
 async function pintarCentros() {
@@ -4719,24 +4862,34 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
   if (guardado) cargarDesdeGeoJSON(guardado);
   refrescarTodo();
   const perfilGuardado = localStorage.getItem(CLAVE_PERFIL);
-  if (perfilGuardado === 'centro' || perfilGuardado === 'admin') aplicarPerfil(perfilGuardado);
-  else $('velo-perfil').classList.add('visible');
-
-  // Nube: restaurar la sesión sin bloquear el arranque; si hay cuenta,
-  // ajustar el perfil y sincronizar en segundo plano.
+  const teniaPerfil = perfilGuardado === 'centro' || perfilGuardado === 'admin';
+  if (teniaPerfil) aplicarPerfil(perfilGuardado);
+  pintarCabeceraCentro();
   pintarNube();
+
+  // Nube: restaurar la sesión sin bloquear el arranque. El modal de inicio
+  // solo se muestra si NO hay sesión de nube ni un perfil elegido antes,
+  // para no parpadear cuando sí hay cuenta guardada.
   (async () => {
-    if (!Nube.disponible()) return;
+    if (!Nube.disponible()) {
+      if (!teniaPerfil) abrirModalInicio();
+      return;
+    }
     const conCuenta = await Nube.iniciar();
     pintarNube();
-    if (!conCuenta) return;
-    aplicarPerfilNube();
-    if (Nube.esCentro()) {
-      const r = await Nube.sincronizar({ silencioso: true });
-      pintarNube();
-      if (r === 'vacia') ofrecerSubida();
-    } else if (Nube.esAdmin()) {
-      Nube.datosRegionales(); // precargar para las vistas de la red
+    pintarCabeceraCentro();
+    if (conCuenta) {
+      aplicarPerfilNube();
+      if (Nube.esCentro()) {
+        const r = await Nube.sincronizar({ silencioso: true });
+        pintarNube();
+        pintarCabeceraCentro();
+        if (r === 'vacia') ofrecerSubida();
+      } else if (Nube.esAdmin()) {
+        Nube.datosRegionales(); // precargar para las vistas de la red
+      }
+    } else if (!teniaPerfil) {
+      abrirModalInicio();
     }
   })();
 

@@ -150,6 +150,11 @@ create policy centros_admin_insert on centros
 drop policy if exists centros_admin_update on centros;
 create policy centros_admin_update on centros
   for update using (soy_admin()) with check (soy_admin());
+-- Un centro puede editar la ficha de SU propio centro (p. ej. el nombre
+-- desde la app). No puede cambiar de centro_id porque el filtro es su propio id.
+drop policy if exists centros_update_propio on centros;
+create policy centros_update_propio on centros
+  for update using (id = mi_centro()) with check (id = mi_centro());
 
 -- Tablas de datos: el centro opera solo sobre sus filas;
 -- el admin (orientación regional) tiene lectura de todas.
