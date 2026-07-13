@@ -5,9 +5,13 @@ monitoricen **patios dinámicos** (recreos organizados por zonas temáticas), y 
 que el equipo de orientación regional estudie el impacto agregado en convivencia
 y bienestar.
 
-**Estado actual (MVP completo sin backend):** todos los módulos funcionan en
+**Estado actual (MVP completo + nube opcional):** todos los módulos funcionan en
 [index.html](index.html) (archivo autónomo sin build) con persistencia en
-localStorage. Solo el panel regional usa datos ficticios de demostración.
+localStorage, que sigue siendo el almacén de trabajo (la app funciona offline
+en el patio). Con la nube configurada (Supabase) y una cuenta de centro, cada
+cambio local se replica y todos los dispositivos del centro ven lo mismo; con
+la cuenta de orientación regional, las vistas de la red muestran los centros y
+datos reales en vez de la demo.
 
 ## Cómo ejecutarlo
 
@@ -56,104 +60,59 @@ dispositivos: **Guardar y compartir → Descargar copia completa / Restaurar cop
 - Guardado en localStorage, exportación/importación de GeoJSON, vista de solo
   lectura "hoy" imprimible con la actividad de cada zona.
 
-## Capa de datos y migración a Supabase
+## Nube (Supabase)
 
-Toda la persistencia pasa por el objeto `DataLayer` en `index.html`
-(buscar `CAPA DE DATOS`). Para migrar: sustituir el cuerpo de sus funciones por
-llamadas a supabase-js **manteniendo las firmas async**; la UI no cambia.
+La app trabaja siempre contra localStorage (offline primero); la nube es una
+**réplica sincronizada**: cada cambio local se encola en un *outbox* persistente
+y se sube cuando hay conexión; al entrar con la cuenta o pulsar "Sincronizar
+ahora" se baja el estado de la nube. Todo el código está en `index.html`
+(buscar `NUBE`); sin configurar, la app queda exactamente como antes.
 
-### Esquema (Postgres + PostGIS, extensión `postgis` activada en Supabase)
+### Puesta en marcha (una vez)
 
-```sql
-create extension if not exists postgis;
+1. Crear un proyecto en [supabase.com](https://supabase.com) (plan gratuito vale).
+2. En **SQL Editor**, pegar y ejecutar [supabase/schema.sql](supabase/schema.sql)
+   completo (tablas + RLS; es idempotente).
+3. En **Authentication → Sign In / Up**: desactivar *Allow new users to sign up*
+   (las cuentas las crea orientación regional, no hay registro público).
+4. En **Authentication → Users → Add user**: crear las cuentas (email +
+   contraseña) y ligarlas a su centro con los `insert` comentados al final de
+   `schema.sql` (rol `centro` con `centro_id`; rol `admin` sin centro).
+5. En **Settings → API**, copiar la *Project URL* y la clave *anon/public* y
+   pegarlas en `index.html` en las constantes `NUBE_URL` y `NUBE_CLAVE_ANON`
+   (la clave anon es pública por diseño: la seguridad la pone el RLS).
+6. Publicar y **subir `VERSION` en sw.js**.
 
-create table centros (
-  id uuid primary key default gen_random_uuid(),
-  nombre text not null,
-  direccion text,
-  tipo text check (tipo in ('colegio','instituto')),
-  created_at timestamptz default now()
-);
+En el primer inicio de sesión de un centro cuya nube está vacía, la app ofrece
+"⬆️ Subir este dispositivo" para volcar todo lo local (este es el traspaso que
+antes se hacía con la copia completa).
 
-create table patios (
-  id uuid primary key default gen_random_uuid(),
-  centro_id uuid references centros not null,
-  perimetro geometry(Polygon, 4326) not null
-);
+### Esquema y decisiones
 
-create table zonas (
-  id uuid primary key default gen_random_uuid(),
-  patio_id uuid references patios not null,
-  nombre text not null,
-  tipo text check (tipo in ('deportiva','lectura','cognitiva','creativa','otra')),
-  geometria geometry(Polygon, 4326) not null,
-  color text,
-  capacidad_estimada int
-);
+- El esquema vive en [supabase/schema.sql](supabase/schema.sql): `centros`,
+  `usuarios`, `patios`, `incidencias`, `ocupaciones`, `encuestas`,
+  `sesiones_encuesta`.
+- El patio se guarda como el **GeoJSON completo en jsonb** (y la rotación como
+  documento jsonb) en vez de geometrías PostGIS normalizadas: la app hace todos
+  los cálculos con turf en el cliente y así el documento viaja íntegro y sin
+  conversiones. Si algún análisis futuro necesita SQL espacial, se puede añadir
+  una columna `geometry` generada sin tocar la app.
+- Los ids los genera el cliente (texto corto con azar) para poder crear
+  registros offline; por eso las claves primarias son `(centro_id, id)` y las
+  subidas son `upsert` (reintentables sin duplicar).
+- Los borrados en la app borran también en la nube; restaurar una copia
+  completa sustituye igualmente el contenido de la nube del centro.
 
-create table rotaciones (
-  id uuid primary key default gen_random_uuid(),
-  patio_id uuid references patios not null,
-  fecha date not null,
-  zona_id uuid references zonas not null,
-  grupo_curso text not null,   -- agregado, ej. "3-4EP"
-  actividad text not null,
-  responsable text             -- profe voluntario que supervisa (nombre de pila/iniciales)
-);
+### Cuentas, roles y RLS
 
-create table incidencias (
-  id uuid primary key default gen_random_uuid(),
-  centro_id uuid references centros not null,
-  zona_id uuid references zonas,
-  fecha date not null,
-  franja_horaria text,
-  curso text not null,         -- agregado, NUNCA alumno individual
-  tipo text check (tipo in ('conflicto','exclusion','otro')),
-  gravedad smallint check (gravedad between 1 and 3),
-  notas_breves text
-);
-
-create table encuestas_bienestar (
-  id uuid primary key default gen_random_uuid(),
-  centro_id uuid references centros not null,
-  fecha date not null,
-  curso text not null,
-  tipo_respondente text check (tipo_respondente in ('alumnado','profesorado')),
-  puntuacion smallint check (puntuacion between 1 and 5),
-  comentario_opcional text
-);
-```
-
-Conversión GeoJSON ↔ PostGIS: `ST_GeomFromGeoJSON(...)` al guardar,
-`ST_AsGeoJSON(...)` al leer. Áreas/contención nativas: `ST_Area(geography)`,
-`ST_Contains`, `ST_Intersects`.
-
-### Cuentas y roles
-
-Dos niveles de cuenta (la UI ya los simula con el selector de perfil; con Supabase
-se sustituye por auth real):
-
-```sql
-create table usuarios (
-  id uuid primary key references auth.users,
-  centro_id uuid references centros,          -- null para el rol admin
-  rol text not null check (rol in ('centro','admin'))
-);
-```
-
-- **centro**: cuenta propia de cada centro; ve y edita solo sus patios, rotaciones,
-  incidencias, recuentos y encuestas.
-- **admin** (orientación regional): lectura de **todos** los patios y zonas
-  (vista "Centros y patios") y acceso al panel de investigación.
-
-### RLS (Row Level Security)
-
-- Cada centro solo ve/edita sus propias filas (`centro_id` del usuario vía tabla
-  `usuarios`).
-- El rol admin tiene `select` sobre patios/zonas/rotaciones de todos los centros
-  (solo lectura), y para investigación **solo** accede a vistas agregadas
-  (por zona/franja/curso, mínimo k centros o k registros por celda), nunca a las
-  tablas base con detalle salvo consentimiento institucional explícito.
+- **centro**: ve y edita solo las filas de su `centro_id` (vía tabla `usuarios`
+  y funciones `mi_centro()` / `soy_admin()`, `security definer` para evitar
+  recursión de políticas).
+- **admin** (orientación regional): `select` sobre todas las tablas — que ya
+  son agregadas por diseño (curso/grupo, nunca alumnado individual) — y
+  gestión de la tabla `centros`. Para la fase de investigación formal se
+  añadirán vistas agregadas con mínimo k por celda.
+- Las encuestas son anónimas: no llevan ningún identificador de persona.
 
 ## Protección de datos (decisión de diseño, no negociable)
 
@@ -202,6 +161,8 @@ create table usuarios (
     registrado como **sesión por curso y trimestre** (la encuesta es anónima,
     así que el control es por curso, no por persona); al repetir curso la app
     avisa y pide confirmación.
-11. Fase 2 (final): Supabase — auth por centro, PostGIS, RLS, vistas agregadas
-   para el rol investigador; sustituir datos demo del panel regional y sincronizar
-   dispositivos sin copia manual.
+11. ✅ **Nube (Supabase):** auth por centro con RLS, sincronización offline con
+    outbox (localStorage sigue siendo el almacén de trabajo), subida inicial del
+    dispositivo, y datos reales para el rol admin en "Centros y patios" y en el
+    panel regional (sustituyen a la demo cuando existen). Queda para después:
+    vistas agregadas k-anónimas para investigación formal y realtime.

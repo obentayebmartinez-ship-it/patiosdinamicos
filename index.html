@@ -17,6 +17,7 @@
 <script src="lib/leaflet-rotate.js"></script>
 <script src="lib/leaflet.draw.js"></script>
 <script src="lib/turf.min.js"></script>
+<script src="lib/supabase.js"></script>
 
 <style>
 /* Tipografía local: Baloo 2 (variable 400-800, títulos) + Atkinson Hyperlegible (cuerpo) */
@@ -932,6 +933,11 @@ body.modo-hoy .panel-hoy { display: block; }
       </div>
     </div>
 
+    <div class="tarjeta" id="tarjeta-nube">
+      <h3>☁️ Nube del centro</h3>
+      <div id="nube-contenido"></div>
+    </div>
+
     <div class="tarjeta">
       <h3>👁️ Vista de hoy</h3>
       <p class="ayuda">Muestra qué actividad toca hoy en cada zona. Pensada para imprimir o proyectar en el panel del patio.</p>
@@ -978,14 +984,14 @@ body.modo-hoy .panel-hoy { display: block; }
 
 <section id="vista-centros" class="vista vista-mock">
   <h2>Centros y patios del piloto</h2>
-  <span class="aviso-fase">🧪 Los centros marcados como demo son ficticios; con la fase de nube aparecerán aquí los centros reales (solo lectura)</span>
+  <span class="aviso-fase" id="aviso-centros">🧪 Los centros marcados como demo son ficticios; conéctate con la cuenta de orientación regional para ver los centros reales (solo lectura)</span>
   <p>Vista del equipo de orientación regional: centros participantes y estado de sus patios.</p>
   <div id="contenido-centros"></div>
 </section>
 
 <section id="vista-regional" class="vista vista-mock">
   <h2>Panel de investigación regional</h2>
-  <span class="aviso-fase">🧪 Demostración — 3 centros ficticios con datos inventados; los reales llegarán con Supabase</span>
+  <span class="aviso-fase" id="aviso-regional">🧪 Demostración — 3 centros ficticios con datos inventados; conéctate con la cuenta de orientación regional para ver los datos reales</span>
   <p>Datos <strong>agregados y anonimizados por defecto</strong> de los centros participantes. Ningún dato baja del nivel centro; ningún dato de alumnado individual sube aquí.</p>
   <div id="contenido-regional"></div>
 </section>
@@ -1044,9 +1050,9 @@ body.modo-hoy .panel-hoy { display: block; }
   <div class="modal">
     <h2>¿Con qué perfil entras?</h2>
     <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:4px;">
-      Demostración de los dos niveles de la plataforma. Con la fase de nube, cada centro
-      tendrá su propia cuenta con contraseña y el equipo regional verá todos los centros;
-      de momento este selector solo cambia lo que se muestra en este dispositivo.
+      Este selector solo cambia lo que se muestra en este dispositivo. Si tu centro ya
+      tiene cuenta de la nube, entra desde la tarjeta <strong>☁️ Nube del centro</strong>
+      del editor: el perfil se ajusta solo y los datos se sincronizan.
     </p>
     <div class="botonera-grande" style="grid-template-columns:1fr 1fr; margin-top:10px;">
       <button id="perfil-eleccion-centro"><span class="ic">🏫</span>Equipo del centro</button>
@@ -1259,19 +1265,25 @@ const DataLayer = {
     const p = { id: this._nuevoId('p'), nombre };
     lista.push(p);
     this._guardarListaPatios(lista);
+    if (Nube.esCentro()) Nube.replicarPatioMeta(p);
     return p;
   },
 
   renombrarPatio(id, nombre) {
     const lista = this.listarPatios() || [];
     const p = lista.find(x => x.id === id);
-    if (p) { p.nombre = nombre; this._guardarListaPatios(lista); }
+    if (p) {
+      p.nombre = nombre;
+      this._guardarListaPatios(lista);
+      if (Nube.esCentro()) Nube.replicarPatioMeta(p);
+    }
   },
 
   borrarPatio(id) {
     const lista = (this.listarPatios() || []).filter(p => p.id !== id);
     this._guardarListaPatios(lista);
     for (const tipo of TIPOS_DATO_PATIO) localStorage.removeItem(`${this.PREFIJO}:${tipo}:${id}`);
+    Nube.borrarPatioEnNube(id);
   },
 
   /* ---- Copia completa (traspaso entre dispositivos mientras no haya backend) ---- */
@@ -1301,11 +1313,15 @@ const DataLayer = {
       }
     }
     this.cambiarPatio(copia.patios[0].id);
+    // Con cuenta de centro, restaurar una copia también sustituye la nube
+    // (los borrados ya se encolaron arriba; ahora se sube el estado nuevo)
+    if (Nube.esCentro()) Nube.subirTodo();
   },
 
   /* ---- Datos del patio activo ---- */
   async guardarPatio(geojson) {
     localStorage.setItem(this._clave('patio'), JSON.stringify(geojson));
+    if (Nube.esCentro()) Nube.replicarPatioDoc('geojson', geojson);
     return { ok: true, fecha: new Date() };
   },
 
@@ -1318,6 +1334,7 @@ const DataLayer = {
   // Con Supabase: upsert/select en la tabla `rotaciones` (fecha, zona_id, grupo_curso, actividad).
   async guardarRotacion(rotacion) {
     localStorage.setItem(this._clave('rotacion'), JSON.stringify(rotacion));
+    if (Nube.esCentro()) Nube.replicarPatioDoc('rotacion', rotacion);
     return { ok: true };
   },
 
@@ -1333,6 +1350,7 @@ const DataLayer = {
     inc.id = this._nuevoId('i');
     lista.push(inc);
     localStorage.setItem(this._clave('incidencias'), JSON.stringify(lista));
+    Nube.replicarRegistro('incidencias', inc);
     return { ok: true, id: inc.id };
   },
 
@@ -1345,6 +1363,7 @@ const DataLayer = {
   async borrarIncidencia(id) {
     const lista = (await this.listarIncidencias()).filter(i => i.id !== id);
     localStorage.setItem(this._clave('incidencias'), JSON.stringify(lista));
+    if (Nube.esCentro()) Nube.borrarRegistro('incidencias', id);
     return { ok: true };
   },
 
@@ -1353,6 +1372,7 @@ const DataLayer = {
     const lista = await this.listarIncidencias();
     lista.push(inc);
     localStorage.setItem(this._clave('incidencias'), JSON.stringify(lista));
+    Nube.replicarRegistro('incidencias', inc);
     return { ok: true };
   },
 
@@ -1364,6 +1384,7 @@ const DataLayer = {
     reg.id = this._nuevoId('o');
     lista.push(reg);
     localStorage.setItem(this._clave('ocupacion'), JSON.stringify(lista));
+    Nube.replicarRegistro('ocupaciones', reg);
     return { ok: true, id: reg.id };
   },
 
@@ -1376,6 +1397,7 @@ const DataLayer = {
   async borrarOcupacion(id) {
     const lista = (await this.listarOcupaciones()).filter(o => o.id !== id);
     localStorage.setItem(this._clave('ocupacion'), JSON.stringify(lista));
+    if (Nube.esCentro()) Nube.borrarRegistro('ocupaciones', id);
     return { ok: true };
   },
 
@@ -1383,6 +1405,7 @@ const DataLayer = {
     const lista = await this.listarOcupaciones();
     lista.push(reg);
     localStorage.setItem(this._clave('ocupacion'), JSON.stringify(lista));
+    Nube.replicarRegistro('ocupaciones', reg);
     return { ok: true };
   },
 
@@ -1394,6 +1417,7 @@ const DataLayer = {
     enc.id = this._nuevoId('e');
     lista.push(enc);
     localStorage.setItem(this._clave('encuestas'), JSON.stringify(lista));
+    Nube.replicarRegistro('encuestas', enc);
     return { ok: true };
   },
 
@@ -1411,6 +1435,7 @@ const DataLayer = {
     s.id = this._nuevoId('s');
     lista.push(s);
     localStorage.setItem(this._clave('sesiones-encuesta'), JSON.stringify(lista));
+    Nube.replicarRegistro('sesiones_encuesta', s);
     return { ok: true };
   },
 
@@ -1438,6 +1463,283 @@ const DataLayer = {
     };
   }
 };
+
+/* ============================================================
+   NUBE (Supabase) — sincronización opcional.
+   La app SIGUE trabajando contra localStorage (funciona offline en
+   el patio); la nube es una réplica: cada cambio local se encola en
+   un outbox y se sube cuando hay conexión; al entrar o sincronizar
+   se baja el estado de la nube y se reescribe el almacén local.
+   Sin cuenta (o sin configurar) todo queda exactamente como antes.
+   ============================================================ */
+
+// ⚙️ Rellenar al crear el proyecto en supabase.com (Settings → API).
+// La clave "anon" es pública por diseño: la seguridad la pone el RLS.
+const NUBE_URL = '';
+const NUBE_CLAVE_ANON = '';
+
+const Nube = {
+  cliente: null,
+  usuario: null,  // fila de `usuarios`: { id, centro_id, rol }
+  centro: null,   // fila de `centros` (si rol centro)
+  email: null,
+  CLAVE_OUTBOX: 'patios-dinamicos:outbox',
+  CLAVE_CUENTA: 'patios-dinamicos:nube-cuenta',
+  _procesando: false,
+  _cacheRegional: null,
+
+  disponible() { return typeof supabase !== 'undefined' && !!(NUBE_URL && NUBE_CLAVE_ANON); },
+  conectada() { return !!this.usuario; },
+  esAdmin() { return !!this.usuario && this.usuario.rol === 'admin'; },
+  esCentro() { return !!this.usuario && this.usuario.rol === 'centro' && !!this.usuario.centro_id; },
+
+  async iniciar() {
+    if (!this.disponible()) return false;
+    this.cliente = supabase.createClient(NUBE_URL, NUBE_CLAVE_ANON);
+    this.cliente.auth.onAuthStateChange(evento => {
+      if (evento === 'SIGNED_OUT') {
+        this.usuario = this.centro = this.email = null;
+        localStorage.removeItem(this.CLAVE_CUENTA);
+        if (typeof pintarNube === 'function') pintarNube();
+      }
+    });
+    const { data: { session } } = await this.cliente.auth.getSession();
+    if (!session) return false;
+    return await this._cargarCuenta(session);
+  },
+
+  async entrar(email, clave) {
+    const { data, error } = await this.cliente.auth.signInWithPassword({ email, password: clave });
+    if (error) {
+      throw new Error(/invalid login credentials/i.test(error.message)
+        ? 'Correo o contraseña incorrectos.' : 'No se pudo entrar: ' + error.message);
+    }
+    const ok = await this._cargarCuenta(data.session);
+    if (!ok) throw new Error('La cuenta no está dada de alta en la plataforma. Avisa a orientación regional.');
+  },
+
+  async salir() {
+    try { await this.cliente.auth.signOut(); } catch (e) { /* sin conexión: la sesión local se borra igual */ }
+    this.usuario = this.centro = this.email = null;
+    localStorage.removeItem(this.CLAVE_CUENTA);
+  },
+
+  // Carga la fila de `usuarios` (rol + centro). Si no hay conexión,
+  // reutiliza la cuenta cacheada para poder trabajar offline con sesión.
+  async _cargarCuenta(session) {
+    this.email = session.user.email;
+    let u = null;
+    try {
+      const r = await this.cliente.from('usuarios').select('*').eq('id', session.user.id).maybeSingle();
+      if (r.error) throw r.error;
+      u = r.data;
+    } catch (e) {
+      const cache = localStorage.getItem(this.CLAVE_CUENTA);
+      if (cache) {
+        const c = JSON.parse(cache);
+        this.usuario = c.usuario; this.centro = c.centro;
+        return true;
+      }
+      return false;
+    }
+    if (!u) { await this.salir(); return false; }
+    this.usuario = u;
+    this.centro = null;
+    if (u.centro_id) {
+      const r = await this.cliente.from('centros').select('*').eq('id', u.centro_id).maybeSingle();
+      this.centro = r.data || null;
+    }
+    localStorage.setItem(this.CLAVE_CUENTA, JSON.stringify({ usuario: this.usuario, centro: this.centro }));
+    return true;
+  },
+
+  /* ---- Outbox: cola persistente de cambios pendientes de subir ---- */
+  _outbox() {
+    try { return JSON.parse(localStorage.getItem(this.CLAVE_OUTBOX)) || []; } catch (e) { return []; }
+  },
+  _guardarOutbox(caja) {
+    localStorage.setItem(this.CLAVE_OUTBOX, JSON.stringify(caja));
+    this._pintarEstado();
+  },
+  _pintarEstado() {
+    const el = document.getElementById('nube-estado');
+    if (!el) return;
+    const n = this._outbox().length;
+    el.textContent = n ? `⏳ ${n} cambio${n === 1 ? '' : 's'} pendiente${n === 1 ? '' : 's'} de subir` : '✅ Todo sincronizado';
+  },
+
+  // op = { t: 'up'|'del'|'delpatio', tabla, id, fila? }
+  // Dedupe por (tabla, id): la operación nueva sustituye a la pendiente
+  // (los upserts parciales de `patios` se fusionan para no perder campos).
+  encolar(op) {
+    if (!this.esCentro()) return;
+    const caja = this._outbox();
+    const i = caja.findIndex((o, k) => o.tabla === op.tabla && o.id === op.id && !(this._procesando && k === 0));
+    if (i >= 0) {
+      const previa = caja.splice(i, 1)[0];
+      if (op.t === 'up' && previa.t === 'up') op.fila = { ...previa.fila, ...op.fila };
+    }
+    caja.push(op);
+    this._guardarOutbox(caja);
+    this.procesar();
+  },
+
+  async procesar() {
+    if (this._procesando || !this.esCentro() || !this.cliente || !navigator.onLine) return;
+    this._procesando = true;
+    try {
+      while (true) {
+        const caja = this._outbox(); // releer cada vuelta: encolar() puede añadir mientras subimos
+        if (!caja.length) break;
+        const op = caja[0];
+        let r;
+        if (op.t === 'up') r = await this.cliente.from(op.tabla).upsert(op.fila);
+        else if (op.t === 'del') r = await this.cliente.from(op.tabla).delete().match({ centro_id: this.usuario.centro_id, id: op.id });
+        else r = await this.cliente.from(op.tabla).delete().match({ centro_id: this.usuario.centro_id, patio_id: op.id });
+        if (r.error) { console.warn('Nube: reintento pendiente', op.tabla, op.id, r.error.message); break; }
+        this._guardarOutbox(this._outbox().slice(1));
+      }
+    } finally {
+      this._procesando = false;
+      this._pintarEstado();
+    }
+  },
+
+  /* ---- Réplica de cambios locales (llamadas desde DataLayer) ---- */
+  _nombrePatio(id) {
+    const p = (DataLayer.listarPatios() || []).find(x => x.id === id);
+    return p ? p.nombre : 'Patio';
+  },
+  // campo: 'geojson' | 'rotacion'. Incluye siempre nombre para que el
+  // primer upsert (insert) no viole el NOT NULL.
+  replicarPatioDoc(campo, valor) {
+    const id = DataLayer.patioActivo;
+    this.encolar({
+      t: 'up', tabla: 'patios', id,
+      fila: { centro_id: this.usuario && this.usuario.centro_id, id, nombre: this._nombrePatio(id), actualizado: new Date().toISOString(), [campo]: valor }
+    });
+  },
+  replicarPatioMeta(p) {
+    this.encolar({
+      t: 'up', tabla: 'patios', id: p.id,
+      fila: { centro_id: this.usuario && this.usuario.centro_id, id: p.id, nombre: p.nombre, actualizado: new Date().toISOString() }
+    });
+  },
+  replicarRegistro(tabla, reg, patioId) {
+    if (!this.esCentro()) return;
+    this.encolar({ t: 'up', tabla, id: reg.id, fila: this._aFila(tabla, reg, patioId || DataLayer.patioActivo) });
+  },
+  borrarRegistro(tabla, id) {
+    this.encolar({ t: 'del', tabla, id });
+  },
+  borrarPatioEnNube(id) {
+    if (!this.esCentro()) return;
+    for (const tabla of ['incidencias', 'ocupaciones', 'encuestas', 'sesiones_encuesta']) this.encolar({ t: 'delpatio', tabla, id });
+    this.encolar({ t: 'del', tabla: 'patios', id });
+  },
+
+  /* ---- Conversión objeto local ↔ fila de la tabla ---- */
+  _aFila(tabla, r, patioId) {
+    const base = { centro_id: this.usuario.centro_id, patio_id: patioId, id: r.id };
+    if (tabla === 'incidencias') return { ...base, fecha: r.fecha, hora: r.hora ?? null, zona_id: r.zonaId ?? null, zona_nombre: r.zonaNombre ?? null, tipo: r.tipo ?? null, curso: r.curso, gravedad: r.gravedad ?? null, franja: r.franja ?? null, nota: r.nota ?? null };
+    if (tabla === 'ocupaciones') return { ...base, fecha: r.fecha, hora: r.hora ?? null, niveles: r.niveles };
+    if (tabla === 'encuestas') return { ...base, fecha: r.fecha, trimestre: r.trimestre ?? null, tipo_respondente: r.tipoRespondente ?? null, curso: r.curso, puntuacion: r.puntuacion ?? null, respuestas: r.respuestas ?? null, comentario: r.comentario ?? null, metodo: r.metodo ?? 'directo' };
+    return { ...base, fecha: r.fecha, trimestre: r.trimestre ?? null, tipo_respondente: r.tipoRespondente ?? null, curso: r.curso ?? null, metodo: r.metodo ?? null, n: r.n ?? null }; // sesiones_encuesta
+  },
+  _deFila(tabla, f) {
+    if (tabla === 'incidencias') return { id: f.id, fecha: f.fecha, hora: f.hora, zonaId: f.zona_id, zonaNombre: f.zona_nombre, tipo: f.tipo, curso: f.curso, gravedad: f.gravedad, franja: f.franja, nota: f.nota };
+    if (tabla === 'ocupaciones') return { id: f.id, fecha: f.fecha, hora: f.hora, niveles: f.niveles };
+    if (tabla === 'encuestas') return { id: f.id, fecha: f.fecha, trimestre: f.trimestre, tipoRespondente: f.tipo_respondente, curso: f.curso, puntuacion: f.puntuacion == null ? null : Number(f.puntuacion), respuestas: f.respuestas, comentario: f.comentario, metodo: f.metodo };
+    return { id: f.id, fecha: f.fecha, trimestre: f.trimestre, tipoRespondente: f.tipo_respondente, curso: f.curso, metodo: f.metodo, n: f.n };
+  },
+
+  /* ---- Subida inicial: vuelca todo el dispositivo a la nube (aditiva) ---- */
+  async subirTodo() {
+    if (!this.esCentro()) return;
+    const tablas = { incidencias: 'incidencias', ocupacion: 'ocupaciones', encuestas: 'encuestas', 'sesiones-encuesta': 'sesiones_encuesta' };
+    for (const p of DataLayer.listarPatios() || []) {
+      const leer = tipo => {
+        const b = localStorage.getItem(`${DataLayer.PREFIJO}:${tipo}:${p.id}`);
+        return b ? JSON.parse(b) : null;
+      };
+      this.encolar({
+        t: 'up', tabla: 'patios', id: p.id,
+        fila: { centro_id: this.usuario.centro_id, id: p.id, nombre: p.nombre, geojson: leer('patio'), rotacion: leer('rotacion'), actualizado: new Date().toISOString() }
+      });
+      for (const [tipo, tabla] of Object.entries(tablas)) {
+        for (const r of leer(tipo) || []) this.replicarRegistro(tabla, r, p.id);
+      }
+    }
+    await this.procesar();
+  },
+
+  /* ---- Bajada: reescribe el almacén local con el estado de la nube ---- */
+  async bajarTodo() {
+    if (!this.esCentro() || !navigator.onLine) return false;
+    const cid = this.usuario.centro_id;
+    const de = tabla => this.cliente.from(tabla).select('*').eq('centro_id', cid);
+    const [p, i, o, e, s] = await Promise.all([de('patios'), de('incidencias'), de('ocupaciones'), de('encuestas'), de('sesiones_encuesta')]);
+    if (p.error || i.error || o.error || e.error || s.error) return false;
+    if (!p.data.length) return 'vacia';
+    for (const pat of DataLayer.listarPatios() || []) {
+      for (const tipo of TIPOS_DATO_PATIO) localStorage.removeItem(`${DataLayer.PREFIJO}:${tipo}:${pat.id}`);
+    }
+    DataLayer._guardarListaPatios(p.data.map(x => ({ id: x.id, nombre: x.nombre })));
+    for (const x of p.data) {
+      if (x.geojson) localStorage.setItem(`${DataLayer.PREFIJO}:patio:${x.id}`, JSON.stringify(x.geojson));
+      if (x.rotacion) localStorage.setItem(`${DataLayer.PREFIJO}:rotacion:${x.id}`, JSON.stringify(x.rotacion));
+    }
+    const volcar = (tipo, tabla, filas) => {
+      const porPatio = {};
+      for (const f of filas) (porPatio[f.patio_id] = porPatio[f.patio_id] || []).push(this._deFila(tabla, f));
+      for (const [pid, lista] of Object.entries(porPatio)) localStorage.setItem(`${DataLayer.PREFIJO}:${tipo}:${pid}`, JSON.stringify(lista));
+    };
+    volcar('incidencias', 'incidencias', i.data);
+    volcar('ocupacion', 'ocupaciones', o.data);
+    volcar('encuestas', 'encuestas', e.data);
+    volcar('sesiones-encuesta', 'sesiones_encuesta', s.data);
+    return true;
+  },
+
+  // Sube lo pendiente y, si no queda nada por subir, baja el estado de la
+  // nube y recarga la interfaz. Devuelve true | false | 'vacia' | 'pendiente'.
+  async sincronizar({ silencioso } = {}) {
+    if (!this.esCentro()) return false;
+    await this.procesar();
+    if (this._outbox().length) {
+      if (!silencioso) avisar('Hay cambios pendientes de subir (¿sin conexión?). Se reintentará automáticamente.');
+      return 'pendiente';
+    }
+    let r;
+    try { r = await this.bajarTodo(); } catch (e) { r = false; }
+    if (r === true) {
+      clearTimeout(tempAutoguardado); tempAutoguardado = null; // que el autoguardado no machaque lo recién bajado
+      patios = DataLayer.listarPatios();
+      const activo = patios.some(x => x.id === DataLayer.patioActivo) ? DataLayer.patioActivo : patios[0].id;
+      await activarPatio(activo);
+      if (!silencioso) avisar('Datos sincronizados con la nube.');
+    } else if (r === false && !silencioso) {
+      avisar('No se pudo sincronizar (¿sin conexión?). Los datos locales siguen intactos.');
+    }
+    return r;
+  },
+
+  /* ---- Datos regionales (solo rol admin): todas las tablas, cacheadas 5 min ---- */
+  async datosRegionales(fresco) {
+    if (!this.esAdmin() || !this.cliente || !navigator.onLine) return this._cacheRegional ? this._cacheRegional.d : null;
+    if (this._cacheRegional && !fresco && Date.now() - this._cacheRegional.t < 300000) return this._cacheRegional.d;
+    try {
+      const de = tabla => this.cliente.from(tabla).select('*');
+      const [c, p, i, o, e] = await Promise.all([de('centros'), de('patios'), de('incidencias'), de('ocupaciones'), de('encuestas')]);
+      if (c.error) return null;
+      const d = { centros: c.data || [], patios: p.data || [], incidencias: i.data || [], ocupaciones: o.data || [], encuestas: e.data || [] };
+      this._cacheRegional = { t: Date.now(), d };
+      return d;
+    } catch (e) { return null; }
+  }
+};
+
+window.addEventListener('online', () => Nube.procesar());
 
 /* ============================================================
    MAPA
@@ -3686,6 +3988,72 @@ const CENTROS_DEMO = [
   }
 ];
 
+/* ---- Centros reales (rol admin con nube): se transforman a la misma
+   forma que CENTROS_DEMO para reutilizar tal cual gráficos, CSV e informe.
+   Series mensuales del curso actual (Sep…Jun); los meses sin ningún
+   registro quedan a null y los gráficos/tablas los saltan. ---- */
+const PALETA_REGIONAL = ['#2a78d6', '#1baf7a', '#eda100', '#7c6fb0', '#e4572e', '#3e7cb1'];
+
+function cursoInicio(fechaISO) { // año en que empieza el curso de esa fecha (jul-ago → curso anterior)
+  const y = +fechaISO.slice(0, 4), m = +fechaISO.slice(5, 7);
+  return m >= 9 ? y : y - 1;
+}
+function cursoActualInicio() { return cursoInicio(fechaISOLocal()); }
+function mesCursoIdx(fechaISO) { // Sep=0 … Jun=9; jul/ago → null
+  const m = +fechaISO.slice(5, 7);
+  return m >= 9 ? m - 9 : (m <= 6 ? m + 3 : null);
+}
+function ultimoValor(a) { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i]; return null; }
+function primerValor(a) { for (const v of a) if (v != null) return v; return null; }
+function numComa(v, dec = 1) { return v == null ? '–' : v.toFixed(dec).replace('.', ','); }
+
+function construirCentrosPanel(d) {
+  const inicio = cursoActualInicio();
+  const delCurso = filas => filas.filter(x => mesCursoIdx(x.fecha) != null && cursoInicio(x.fecha) === inicio);
+  return d.centros.map((c, k) => {
+    const incs = delCurso(d.incidencias.filter(x => x.centro_id === c.id));
+    const ocs = delCurso(d.ocupaciones.filter(x => x.centro_id === c.id));
+    const encs = delCurso(d.encuestas.filter(x => x.centro_id === c.id));
+
+    // Rango de meses con actividad del centro: dentro de él, 0 incidencias
+    // es un cero real; fuera, no hay datos (null)
+    const meses = [...incs, ...ocs, ...encs].map(x => mesCursoIdx(x.fecha));
+    const mesMin = meses.length ? Math.min(...meses) : null;
+    const mesMax = meses.length ? Math.max(...meses) : null;
+
+    const incidencias100 = Array(10).fill(null);
+    const participacion = Array(10).fill(null);
+    if (mesMin != null) {
+      for (let m = mesMin; m <= mesMax; m++) {
+        const nInc = incs.filter(x => mesCursoIdx(x.fecha) === m).length;
+        incidencias100[m] = c.num_alumnos ? (nInc / c.num_alumnos) * 100 : nInc;
+        // "Participación/uso de las zonas": ocupación media del mes en % (niveles 0-3)
+        const nivelesMes = ocs.filter(x => mesCursoIdx(x.fecha) === m)
+          .flatMap(x => Object.values(x.niveles || {})).filter(v => typeof v === 'number');
+        participacion[m] = nivelesMes.length
+          ? Math.round((nivelesMes.reduce((s, v) => s + v, 0) / nivelesMes.length / 3) * 100) : null;
+      }
+    }
+
+    const bienestar = {};
+    for (const tri of ['T1', 'T2', 'T3']) {
+      const punts = encs.filter(x => x.trimestre === tri && x.tipo_respondente === 'alumnado' && x.puntuacion != null)
+        .map(x => Number(x.puntuacion));
+      bienestar[tri] = punts.length ? punts.reduce((s, v) => s + v, 0) / punts.length : null;
+    }
+
+    return {
+      id: c.id, nombre: c.nombre, anonimo: 'Centro ' + String.fromCharCode(65 + (k % 26)),
+      tipo: c.tipo || 'colegio', etapa: c.etapa || 'EP', ruralidad: c.ruralidad || 'urbano',
+      alumnos: c.num_alumnos || 0, color: PALETA_REGIONAL[k % PALETA_REGIONAL.length],
+      incidencias100, participacion, bienestar, real: true, sinAlumnos: !c.num_alumnos
+    };
+  });
+}
+
+let centrosPanel = CENTROS_DEMO; // fuente actual del panel: demo o reales
+let panelEsDemo = true;
+
 let regFiltros = { etapa: 'todas', ruralidad: 'todas', tamano: 'todos' };
 let regNombresVisibles = false;
 
@@ -3694,7 +4062,7 @@ function etiquetaCentro(c) {
 }
 
 function centrosFiltrados() {
-  return CENTROS_DEMO.filter(c =>
+  return centrosPanel.filter(c =>
     (regFiltros.etapa === 'todas' || c.etapa === regFiltros.etapa) &&
     (regFiltros.ruralidad === 'todas' || c.ruralidad === regFiltros.ruralidad) &&
     (regFiltros.tamano === 'todos' ||
@@ -3723,18 +4091,21 @@ function graficoLineasRegional(centros, campo, maxY, decimales) {
   MESES_CURSO.forEach((m, i) => {
     svg += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#898781">${m}</text>`;
   });
-  // Series
+  // Series (los meses a null —sin datos— se saltan; la serie une los que hay)
   for (const c of centros) {
     const vals = c[campo];
-    const puntos = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const pts = [];
+    vals.forEach((v, i) => { if (v != null) pts.push({ px: x(i), py: y(v), i, v }); });
+    if (!pts.length) continue;
+    const puntos = pts.map(p => `${p.px.toFixed(1)},${p.py.toFixed(1)}`).join(' ');
     svg += `<polyline points="${puntos}" fill="none" stroke="${c.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
     // Punto final con anillo de superficie + etiqueta directa (texto en tinta, no en color de serie)
-    const xf = x(n - 1), yf = y(vals[n - 1]);
-    svg += `<circle cx="${xf}" cy="${yf}" r="6" fill="#ffffff"/><circle cx="${xf}" cy="${yf}" r="4" fill="${c.color}"/>`;
-    svg += `<text x="${xf + 9}" y="${yf + 3.5}" font-size="10.5" font-weight="700" fill="#26313b">${vals[n - 1].toFixed(decimales)}</text>`;
+    const fin = pts[pts.length - 1];
+    svg += `<circle cx="${fin.px}" cy="${fin.py}" r="6" fill="#ffffff"/><circle cx="${fin.px}" cy="${fin.py}" r="4" fill="${c.color}"/>`;
+    svg += `<text x="${fin.px + 9}" y="${fin.py + 3.5}" font-size="10.5" font-weight="700" fill="#26313b">${fin.v.toFixed(decimales)}</text>`;
     // Capa de hover: un título nativo por punto
-    vals.forEach((v, i) => {
-      svg += `<circle cx="${x(i)}" cy="${y(v)}" r="9" fill="transparent"><title>${etiquetaCentro(c)} · ${MESES_CURSO[i]}: ${v.toFixed(decimales)}</title></circle>`;
+    pts.forEach(p => {
+      svg += `<circle cx="${p.px}" cy="${p.py}" r="9" fill="transparent"><title>${etiquetaCentro(c)} · ${MESES_CURSO[p.i]}: ${p.v.toFixed(decimales)}</title></circle>`;
     });
   }
   return svg + '</svg>';
@@ -3752,11 +4123,16 @@ function imprimirInformeRegional() {
   if (!cs.length) { avisar('Ningún centro cumple los filtros: no hay nada que incluir en el informe.'); return; }
 
   const hoy = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-  const mediaUlt = cs.reduce((s, c) => s + c.incidencias100[9], 0) / cs.length;
-  const mediaIni = cs.reduce((s, c) => s + c.incidencias100[0], 0) / cs.length;
-  const cambio = Math.round(((mediaUlt - mediaIni) / mediaIni) * 100);
-  const mediaBien = cs.reduce((s, c) => s + c.bienestar.T3, 0) / cs.length;
-  const mediaPart = cs.reduce((s, c) => s + c.participacion[9], 0) / cs.length;
+  const media = valores => {
+    const con = valores.filter(v => v != null);
+    return con.length ? con.reduce((s, v) => s + v, 0) / con.length : null;
+  };
+  const mediaUlt = media(cs.map(c => ultimoValor(c.incidencias100)));
+  const mediaIni = media(cs.map(c => primerValor(c.incidencias100)));
+  const cambio = (mediaUlt != null && mediaIni) ? Math.round(((mediaUlt - mediaIni) / mediaIni) * 100) : null;
+  const mediaBien = media(cs.map(c => c.bienestar.T3 ?? c.bienestar.T2 ?? c.bienestar.T1));
+  const mediaPart = media(cs.map(c => ultimoValor(c.participacion)));
+  const curso = `${cursoActualInicio()}-${(cursoActualInicio() + 1) % 100}`;
 
   const filtrosTxt = [
     regFiltros.etapa !== 'todas' ? 'etapa ' + regFiltros.etapa : '',
@@ -3767,32 +4143,33 @@ function imprimirInformeRegional() {
   const leyenda = `<div class="leyenda-informe">${cs.map(c =>
     `<span><span class="punto" style="background:${c.color}"></span>${etiquetaCentro(c)}</span>`).join('')}</div>`;
 
-  const maxInc = Math.ceil(Math.max(...cs.map(c => Math.max(...c.incidencias100))));
+  const todosInc = cs.flatMap(c => c.incidencias100).filter(v => v != null);
+  const maxInc = Math.max(1, Math.ceil(todosInc.length ? Math.max(...todosInc) : 1));
 
   const filasResumen = cs.map(c => `<tr>
-    <td>${etiquetaCentro(c)}</td><td>${c.etapa}</td><td>${c.ruralidad}</td><td>${c.alumnos}</td>
-    <td>${c.incidencias100[0].toFixed(1).replace('.', ',')}</td>
-    <td>${c.incidencias100[9].toFixed(1).replace('.', ',')}</td>
-    <td>${c.participacion[9]} %</td>
-    <td>${c.bienestar.T3.toFixed(1).replace('.', ',')}</td>
+    <td>${etiquetaCentro(c)}</td><td>${c.etapa}</td><td>${c.ruralidad}</td><td>${c.alumnos || '–'}</td>
+    <td>${numComa(primerValor(c.incidencias100))}</td>
+    <td>${numComa(ultimoValor(c.incidencias100))}</td>
+    <td>${ultimoValor(c.participacion) == null ? '–' : ultimoValor(c.participacion) + ' %'}</td>
+    <td>${numComa(c.bienestar.T3 ?? c.bienestar.T2 ?? c.bienestar.T1)}</td>
   </tr>`).join('');
 
   $('hoja-informe').innerHTML = `<div class="informe">
     <h1>Patios Dinámicos · La Rioja</h1>
-    <div class="sub">Informe regional del piloto — curso 2025-26 · generado el ${hoy} · filtros: ${filtrosTxt}</div>
-    <div class="aviso-demo">🧪 DEMOSTRACIÓN: datos ficticios de 3 centros inventados. Los datos reales llegarán con la fase de nube.</div>
+    <div class="sub">Informe regional del piloto — curso ${curso} · generado el ${hoy} · filtros: ${filtrosTxt}</div>
+    ${panelEsDemo ? '<div class="aviso-demo">🧪 DEMOSTRACIÓN: datos ficticios de 3 centros inventados. Conéctate con la cuenta de orientación regional para el informe real.</div>' : ''}
 
     <div class="kpis-informe">
       <div><div class="etiq">Centros incluidos</div><div class="valor">${cs.length}</div></div>
-      <div><div class="etiq">Incidencias/100 alumnos · jun</div><div class="valor">${mediaUlt.toFixed(1).replace('.', ',')}</div>
-        <div style="font-size:10px; color:${cambio <= 0 ? '#2f9e63' : '#c94f2a'};">${cambio <= 0 ? '▼' : '▲ +'}${cambio} % desde septiembre</div></div>
-      <div><div class="etiq">Bienestar alumnado · T3</div><div class="valor">${mediaBien.toFixed(1).replace('.', ',')} /5</div></div>
-      <div><div class="etiq">Participación media · jun</div><div class="valor">${Math.round(mediaPart)} %</div></div>
+      <div><div class="etiq">Incidencias/100 alumnos · último mes</div><div class="valor">${numComa(mediaUlt)}</div>
+        ${cambio != null ? `<div style="font-size:10px; color:${cambio <= 0 ? '#2f9e63' : '#c94f2a'};">${cambio <= 0 ? '▼' : '▲ +'}${cambio} % desde el inicio</div>` : ''}</div>
+      <div><div class="etiq">Bienestar alumnado · último trimestre</div><div class="valor">${numComa(mediaBien)} /5</div></div>
+      <div><div class="etiq">Uso de las zonas · último mes</div><div class="valor">${mediaPart == null ? '–' : Math.round(mediaPart) + ' %'}</div></div>
     </div>
 
     <h2>Resumen por centro</h2>
     <table>
-      <tr><th>Centro</th><th>Etapa</th><th>Ruralidad</th><th>Alumnos</th><th>Incid./100 · sep</th><th>Incid./100 · jun</th><th>Particip. · jun</th><th>Bienestar T3</th></tr>
+      <tr><th>Centro</th><th>Etapa</th><th>Ruralidad</th><th>Alumnos</th><th>Incid./100 · inicio</th><th>Incid./100 · último</th><th>Uso zonas · último</th><th>Bienestar</th></tr>
       ${filasResumen}
     </table>
 
@@ -3800,7 +4177,7 @@ function imprimirInformeRegional() {
     ${leyenda}
     ${graficoLineasRegional(cs, 'incidencias100', maxInc, 1)}
 
-    <h2>Participación en las zonas (%)</h2>
+    <h2>${panelEsDemo ? 'Participación en las zonas (%)' : 'Uso de las zonas (ocupación media, %)'}</h2>
     ${leyenda}
     ${graficoLineasRegional(cs, 'participacion', 100, 0)}
 
@@ -3828,7 +4205,17 @@ window.addEventListener('afterprint', () => {
 
 async function pintarPanelRegional() {
   const cont = $('contenido-regional');
+
+  // Fuente: centros reales si hay cuenta admin con datos; si no, demo
+  centrosPanel = CENTROS_DEMO; panelEsDemo = true;
+  if (Nube.esAdmin()) {
+    const d = await Nube.datosRegionales();
+    if (d && d.centros.length) { centrosPanel = construirCentrosPanel(d); panelEsDemo = false; }
+  }
+  if ($('aviso-regional')) $('aviso-regional').style.display = panelEsDemo ? '' : 'none';
+
   const cs = centrosFiltrados();
+  const curso = `${cursoActualInicio()}-${(cursoActualInicio() + 1) % 100}`;
 
   let html = `<div class="fila-filtros">
     <label>Etapa <select data-filtro-reg="etapa">
@@ -3856,35 +4243,41 @@ async function pintarPanelRegional() {
   if (!cs.length) {
     html += '<div class="tarjeta">Ningún centro cumple los filtros.</div>';
   } else {
-    // KPIs regionales (media de los centros filtrados)
-    const mediaUlt = cs.reduce((s, c) => s + c.incidencias100[9], 0) / cs.length;
-    const mediaIni = cs.reduce((s, c) => s + c.incidencias100[0], 0) / cs.length;
-    const cambio = Math.round(((mediaUlt - mediaIni) / mediaIni) * 100);
-    const mediaBien = cs.reduce((s, c) => s + c.bienestar.T3, 0) / cs.length;
-    const mediaPart = cs.reduce((s, c) => s + c.participacion[9], 0) / cs.length;
+    // KPIs regionales: media de los centros filtrados que tienen dato
+    // (primer/último mes CON datos de cada centro, no sep/jun fijos)
+    const media = valores => {
+      const con = valores.filter(v => v != null);
+      return con.length ? con.reduce((s, v) => s + v, 0) / con.length : null;
+    };
+    const mediaUlt = media(cs.map(c => ultimoValor(c.incidencias100)));
+    const mediaIni = media(cs.map(c => primerValor(c.incidencias100)));
+    const cambio = (mediaUlt != null && mediaIni) ? Math.round(((mediaUlt - mediaIni) / mediaIni) * 100) : null;
+    const mediaBien = media(cs.map(c => c.bienestar.T3 ?? c.bienestar.T2 ?? c.bienestar.T1));
+    const mediaPart = media(cs.map(c => ultimoValor(c.participacion)));
 
     html += `<div class="panel-kpis">
-      <div class="tile-dato"><div class="etiq">Centros (según filtros)</div><div class="valor">${cs.length}<small> de ${CENTROS_DEMO.length} en el piloto</small></div></div>
-      <div class="tile-dato"><div class="etiq">Incidencias / 100 alumnos · jun</div><div class="valor">${mediaUlt.toFixed(1).replace('.', ',')}</div>
-        <div class="delta ${cambio <= 0 ? 'bueno' : 'malo'}">${cambio <= 0 ? '▼ ' : '▲ +'}${cambio}% desde septiembre</div></div>
-      <div class="tile-dato"><div class="etiq">Bienestar alumnado · T3</div><div class="valor">${mediaBien.toFixed(1).replace('.', ',')}<small> /5</small></div></div>
-      <div class="tile-dato"><div class="etiq">Participación media · jun</div><div class="valor">${Math.round(mediaPart)}<small> %</small></div></div>
+      <div class="tile-dato"><div class="etiq">Centros (según filtros)</div><div class="valor">${cs.length}<small> de ${centrosPanel.length} en el piloto</small></div></div>
+      <div class="tile-dato"><div class="etiq">Incidencias / 100 alumnos · último mes</div><div class="valor">${numComa(mediaUlt)}</div>
+        ${cambio != null ? `<div class="delta ${cambio <= 0 ? 'bueno' : 'malo'}">${cambio <= 0 ? '▼ ' : '▲ +'}${cambio}% desde el inicio</div>` : ''}</div>
+      <div class="tile-dato"><div class="etiq">Bienestar alumnado · último trimestre</div><div class="valor">${numComa(mediaBien)}<small> /5</small></div></div>
+      <div class="tile-dato"><div class="etiq">Uso de las zonas · último mes</div><div class="valor">${mediaPart == null ? '–' : Math.round(mediaPart)}<small> %</small></div></div>
     </div>`;
 
     // Serie temporal de incidencias
-    const maxInc = Math.ceil(Math.max(...cs.map(c => Math.max(...c.incidencias100))));
-    let tablaInc = cs.map(c => `<tr><td>${etiquetaCentro(c)}</td>${c.incidencias100.map(v => `<td>${v.toFixed(1)}</td>`).join('')}</tr>`).join('');
+    const todosInc = cs.flatMap(c => c.incidencias100).filter(v => v != null);
+    const maxInc = Math.max(1, Math.ceil(todosInc.length ? Math.max(...todosInc) : 1));
+    let tablaInc = cs.map(c => `<tr><td>${etiquetaCentro(c)}</td>${c.incidencias100.map(v => `<td>${v == null ? '–' : v.toFixed(1)}</td>`).join('')}</tr>`).join('');
     html += `<div class="grafico-tarjeta">
-      <h4>Incidencias por 100 alumnos y mes (curso 2025-26)</h4>
+      <h4>Incidencias por 100 alumnos y mes (curso ${curso})</h4>
       ${leyendaSeries(cs)}
       <div class="grafico-svg">${graficoLineasRegional(cs, 'incidencias100', maxInc, 1)}</div>
       <details><summary>Ver como tabla</summary><table><tr><th>Centro</th>${MESES_CURSO.map(m => `<th>${m}</th>`).join('')}</tr>${tablaInc}</table></details>
     </div>`;
 
     // Participación (serie temporal)
-    let tablaPart = cs.map(c => `<tr><td>${etiquetaCentro(c)}</td>${c.participacion.map(v => `<td>${v}%</td>`).join('')}</tr>`).join('');
+    let tablaPart = cs.map(c => `<tr><td>${etiquetaCentro(c)}</td>${c.participacion.map(v => `<td>${v == null ? '–' : v + '%'}</td>`).join('')}</tr>`).join('');
     html += `<div class="rejilla-graficos"><div class="grafico-tarjeta">
-      <h4>Participación en las zonas (%)</h4>
+      <h4>${panelEsDemo ? 'Participación en las zonas (%)' : 'Uso de las zonas (ocupación media, %)'}</h4>
       ${leyendaSeries(cs)}
       <div class="grafico-svg">${graficoLineasRegional(cs, 'participacion', 100, 0)}</div>
       <details><summary>Ver como tabla</summary><table><tr><th>Centro</th>${MESES_CURSO.map(m => `<th>${m}</th>`).join('')}</tr>${tablaPart}</table></details>
@@ -3893,8 +4286,10 @@ async function pintarPanelRegional() {
     // Bienestar por trimestre (barras horizontales por centro, valor a la punta)
     let bloquesBien = '';
     for (const tri of ['T1', 'T2', 'T3']) {
+      const conDato = cs.filter(c => c.bienestar[tri] != null);
+      if (!conDato.length) continue; // trimestre sin encuestas todavía
       bloquesBien += `<div style="font-size:11.5px; font-weight:700; color:var(--tinta-suave); margin-top:10px;">${tri}</div>`;
-      for (const c of cs) {
+      for (const c of conDato) {
         bloquesBien += `<div class="fila-barra" title="${etiquetaCentro(c)} · ${tri}: ${c.bienestar[tri].toFixed(1)}/5">
           <span class="etiq"><span class="punto" style="background:${c.color}; border-radius:50%;"></span>${etiquetaCentro(c)}</span>
           <span class="pista"><span class="barra" style="width:${(c.bienestar[tri] / 5) * 100}%; background:${c.color}"></span></span>
@@ -3920,15 +4315,15 @@ async function pintarPanelRegional() {
     let csv = '﻿centro;etapa;ruralidad;alumnos;mes;incidencias_100;participacion_pct\n';
     for (const c of centrosFiltrados()) {
       MESES_CURSO.forEach((m, i) => {
-        csv += `${etiquetaCentro(c)};${c.etapa};${c.ruralidad};${c.alumnos};${m};${c.incidencias100[i].toFixed(1).replace('.', ',')};${c.participacion[i]}\n`;
+        csv += `${etiquetaCentro(c)};${c.etapa};${c.ruralidad};${c.alumnos};${m};${numComa(c.incidencias100[i])};${c.participacion[i] == null ? '–' : c.participacion[i]}\n`;
       });
     }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = 'informe-regional-demo.csv';
+    a.download = panelEsDemo ? 'informe-regional-demo.csv' : 'informe-regional.csv';
     a.click();
     URL.revokeObjectURL(a.href);
-    avisar('CSV exportado (datos ficticios de demostración).');
+    avisar(panelEsDemo ? 'CSV exportado (datos ficticios de demostración).' : 'CSV exportado con los datos reales de los centros.');
   });
   $('btn-reg-pdf').addEventListener('click', imprimirInformeRegional);
 }
@@ -4067,6 +4462,121 @@ $('btn-copia-confirmar').addEventListener('click', async () => {
 });
 
 /* ============================================================
+   NUBE — interfaz de la tarjeta "☁️ Nube del centro"
+   ============================================================ */
+let confirmarSubidaNube = null;
+
+function pintarNube() {
+  const cont = $('nube-contenido');
+  if (!cont) return;
+
+  if (!Nube.disponible()) {
+    cont.innerHTML = `<p class="ayuda">La sincronización en la nube todavía no está activada en esta
+      instalación. Mientras tanto, el traspaso entre dispositivos se hace con la copia completa (arriba).</p>`;
+    return;
+  }
+
+  if (!Nube.conectada()) {
+    cont.innerHTML = `
+      <p class="ayuda">Con la cuenta del centro, todo lo que se registra aquí se guarda también en la nube
+        y todos los dispositivos del centro ven lo mismo. La cuenta la facilita orientación regional.</p>
+      <label style="font-size:12px; font-weight:700; color:var(--tinta-suave);">Correo</label>
+      <input type="email" id="nube-email" autocomplete="username" style="width:100%; box-sizing:border-box; margin-bottom:6px;">
+      <label style="font-size:12px; font-weight:700; color:var(--tinta-suave);">Contraseña</label>
+      <input type="password" id="nube-clave" autocomplete="current-password" style="width:100%; box-sizing:border-box;">
+      <div class="fila-botones" style="margin-top:9px;">
+        <button id="btn-nube-entrar" class="boton pequeno">Entrar</button>
+      </div>
+      <div id="nube-error" style="color:#c94f2a; font-size:12.5px; margin-top:6px;"></div>`;
+    $('btn-nube-entrar').addEventListener('click', entrarNube);
+    $('nube-clave').addEventListener('keydown', e => { if (e.key === 'Enter') entrarNube(); });
+    return;
+  }
+
+  const pend = Nube._outbox().length;
+  const quien = Nube.centro ? esc(Nube.centro.nombre) : (Nube.esAdmin() ? 'orientación regional' : 'sin centro asignado');
+  cont.innerHTML = `
+    <p class="ayuda">Conectado como <strong>${esc(Nube.email || '')}</strong> · ${quien}.</p>
+    <div class="ayuda" id="nube-estado">${pend ? `⏳ ${pend} cambio${pend === 1 ? '' : 's'} pendiente${pend === 1 ? '' : 's'} de subir` : '✅ Todo sincronizado'}</div>
+    <div class="fila-botones" style="margin-top:9px; flex-wrap:wrap;">
+      ${Nube.esCentro() ? `
+        <button id="btn-nube-sync" class="boton secundario pequeno">🔄 Sincronizar ahora</button>
+        <button id="btn-nube-subir" class="boton secundario pequeno" title="Añade a la nube todo lo guardado en este dispositivo">⬆️ Subir este dispositivo</button>` : ''}
+      <button id="btn-nube-salir" class="boton secundario pequeno">Salir</button>
+    </div>`;
+
+  if (Nube.esCentro()) {
+    $('btn-nube-sync').addEventListener('click', async () => {
+      $('btn-nube-sync').disabled = true;
+      const r = await Nube.sincronizar();
+      $('btn-nube-sync') && ($('btn-nube-sync').disabled = false);
+      if (r === 'vacia') ofrecerSubida();
+      pintarNube();
+    });
+    // Subida en dos toques: puede sobrescribir en la nube registros con el mismo id
+    $('btn-nube-subir').addEventListener('click', async () => {
+      const b = $('btn-nube-subir');
+      if (!confirmarSubidaNube) {
+        b.textContent = '¿Seguro? Vuelca TODO este dispositivo';
+        confirmarSubidaNube = setTimeout(() => { b.textContent = '⬆️ Subir este dispositivo'; confirmarSubidaNube = null; }, 5000);
+        return;
+      }
+      clearTimeout(confirmarSubidaNube); confirmarSubidaNube = null;
+      b.disabled = true; b.textContent = 'Subiendo…';
+      await Nube.subirTodo();
+      pintarNube();
+      avisar(Nube._outbox().length
+        ? 'Subida encolada: se completará cuando haya conexión.'
+        : 'Datos de este dispositivo subidos a la nube.');
+    });
+  }
+  $('btn-nube-salir').addEventListener('click', async () => {
+    await Nube.salir();
+    pintarNube();
+    avisar('Sesión cerrada. Los datos guardados en este dispositivo se conservan.');
+  });
+}
+
+function ofrecerSubida() {
+  avisar('La nube de tu centro está vacía.', {
+    texto: '⬆️ Subir este dispositivo',
+    fn: async () => { await Nube.subirTodo(); pintarNube(); avisar('Datos subidos a la nube.'); }
+  });
+}
+
+async function entrarNube() {
+  const email = ($('nube-email').value || '').trim();
+  const clave = $('nube-clave').value;
+  if (!email || !clave) { $('nube-error').textContent = 'Escribe el correo y la contraseña.'; return; }
+  const b = $('btn-nube-entrar');
+  b.disabled = true; b.textContent = 'Entrando…';
+  try {
+    await Nube.entrar(email, clave);
+    pintarNube();
+    aplicarPerfilNube();
+    if (Nube.esCentro()) {
+      const r = await Nube.sincronizar({ silencioso: true });
+      pintarNube();
+      if (r === 'vacia') ofrecerSubida();
+      else if (r === true) avisar('Cuenta conectada y datos sincronizados.');
+      else avisar('Cuenta conectada. La sincronización se completará cuando haya conexión.');
+    } else if (Nube.esAdmin()) {
+      avisar('Cuenta de orientación regional conectada: las vistas de la red muestran ya los centros reales.');
+      Nube.datosRegionales(); // precargar
+    }
+  } catch (err) {
+    b.disabled = false; b.textContent = 'Entrar';
+    $('nube-error').textContent = err.message;
+  }
+}
+
+// Con sesión real, el perfil de la interfaz se deriva del rol de la cuenta
+function aplicarPerfilNube() {
+  if (Nube.esAdmin()) aplicarPerfil('admin');
+  else if (Nube.conectada()) aplicarPerfil('centro');
+}
+
+/* ============================================================
    PERFILES (demostración de los dos niveles de la plataforma).
    Con Supabase: auth real — usuarios con rol 'centro' (ligados a un
    centro_id, RLS solo a sus filas) o 'admin' (orientación regional:
@@ -4098,6 +4608,12 @@ $('btn-cambiar-perfil').addEventListener('click', () => $('velo-perfil').classLi
 async function pintarCentros() {
   const cont = $('contenido-centros');
 
+  // Centros reales de la nube (solo con cuenta admin)
+  let dReg = null;
+  if (Nube.esAdmin()) dReg = await Nube.datosRegionales();
+  const hayReales = !!(dReg && dReg.centros.length);
+  if ($('aviso-centros')) $('aviso-centros').style.display = hayReales ? 'none' : '';
+
   // Patios reales de este dispositivo
   let itemsLocales = '';
   for (const p of (DataLayer.listarPatios() || [])) {
@@ -4128,16 +4644,40 @@ async function pintarCentros() {
       <ul>${itemsLocales || '<li><span class="datos">Sin patios definidos.</span></li>'}</ul>
     </div>`;
 
-  for (const c of CENTROS_DEMO) {
-    html += `<div class="tarjeta tarjeta-centro" style="border-left-color:${c.color}">
-      <div class="cabecera-tc"><h4>${etiquetaCentro(c)}</h4><span class="insignia">🧪 demo</span></div>
-      <ul>
-        <li><span class="datos">${c.etapa === 'EP' ? 'Primaria' : 'Secundaria'} · ${c.ruralidad} · ${c.alumnos} alumnos</span></li>
-        <li><span class="datos">Incidencias/100 · jun: <strong>${c.incidencias100[9].toFixed(1).replace('.', ',')}</strong>
-          · participación: <strong>${c.participacion[9]} %</strong></span></li>
-        <li><span class="datos">Con la nube: patio y zonas en solo lectura.</span></li>
-      </ul>
-    </div>`;
+  if (hayReales) {
+    // Tarjetas de los centros reales de la nube (lectura del rol admin)
+    for (let k = 0; k < dReg.centros.length; k++) {
+      const c = dReg.centros[k];
+      const color = PALETA_REGIONAL[k % PALETA_REGIONAL.length];
+      const inc7 = dReg.incidencias.filter(i => i.centro_id === c.id && i.fecha >= fechaHaceDias(6)).length;
+      const pats = dReg.patios.filter(p => p.centro_id === c.id);
+      const itemsPatios = pats.map(p => {
+        const nZonas = ((p.geojson || {}).features || []).filter(f => f.properties && f.properties.rol === 'zona').length;
+        const per = ((p.geojson || {}).features || []).find(f => f.properties && f.properties.rol === 'perimetro');
+        const area = per && per.properties.area_m2 ? ' · ' + formatearArea(per.properties.area_m2) : '';
+        return `<li>🏞️ <strong>${esc(p.nombre)}</strong> <span class="datos">${nZonas} zona${nZonas === 1 ? '' : 's'}${area}</span></li>`;
+      }).join('');
+      html += `<div class="tarjeta tarjeta-centro" style="border-left-color:${color}">
+        <div class="cabecera-tc"><h4>${esc(c.nombre)}</h4><span class="insignia">☁️ nube</span></div>
+        <ul>
+          <li><span class="datos">${esc(c.etapa || '—')} · ${esc(c.ruralidad || '—')} · ${c.num_alumnos ? c.num_alumnos + ' alumnos' : 'alumnado sin indicar'}</span></li>
+          ${itemsPatios || '<li><span class="datos">Sin patios dibujados todavía.</span></li>'}
+          <li><span class="datos">Incidencias últimos 7 días: <strong>${inc7}</strong></span></li>
+        </ul>
+      </div>`;
+    }
+  } else {
+    for (const c of CENTROS_DEMO) {
+      html += `<div class="tarjeta tarjeta-centro" style="border-left-color:${c.color}">
+        <div class="cabecera-tc"><h4>${etiquetaCentro(c)}</h4><span class="insignia">🧪 demo</span></div>
+        <ul>
+          <li><span class="datos">${c.etapa === 'EP' ? 'Primaria' : 'Secundaria'} · ${c.ruralidad} · ${c.alumnos} alumnos</span></li>
+          <li><span class="datos">Incidencias/100 · jun: <strong>${c.incidencias100[9].toFixed(1).replace('.', ',')}</strong>
+            · participación: <strong>${c.participacion[9]} %</strong></span></li>
+          <li><span class="datos">Con la nube: patio y zonas en solo lectura.</span></li>
+        </ul>
+      </div>`;
+    }
   }
   html += '</div>';
   cont.innerHTML = html;
@@ -4181,6 +4721,24 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
   const perfilGuardado = localStorage.getItem(CLAVE_PERFIL);
   if (perfilGuardado === 'centro' || perfilGuardado === 'admin') aplicarPerfil(perfilGuardado);
   else $('velo-perfil').classList.add('visible');
+
+  // Nube: restaurar la sesión sin bloquear el arranque; si hay cuenta,
+  // ajustar el perfil y sincronizar en segundo plano.
+  pintarNube();
+  (async () => {
+    if (!Nube.disponible()) return;
+    const conCuenta = await Nube.iniciar();
+    pintarNube();
+    if (!conCuenta) return;
+    aplicarPerfilNube();
+    if (Nube.esCentro()) {
+      const r = await Nube.sincronizar({ silencioso: true });
+      pintarNube();
+      if (r === 'vacia') ofrecerSubida();
+    } else if (Nube.esAdmin()) {
+      Nube.datosRegionales(); // precargar para las vistas de la red
+    }
+  })();
 
   // PWA: instalable y funcional sin conexión (salvo el fondo del mapa y las búsquedas)
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {

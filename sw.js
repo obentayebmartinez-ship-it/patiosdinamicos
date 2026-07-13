@@ -1,7 +1,7 @@
 /* Service worker de Patios Dinámicos.
    IMPORTANTE: al publicar cualquier cambio en index.html o en lib/,
    subir el número de VERSION para que los dispositivos se actualicen. */
-const VERSION = 'patios-v2';
+const VERSION = 'patios-v3';
 
 const APP_SHELL = [
   './',
@@ -15,6 +15,7 @@ const APP_SHELL = [
   'lib/leaflet.draw.js',
   'lib/leaflet-rotate.js',
   'lib/turf.min.js',
+  'lib/supabase.js',
   'lib/images/layers.png',
   'lib/images/layers-2x.png',
   'lib/images/marker-icon.png',
