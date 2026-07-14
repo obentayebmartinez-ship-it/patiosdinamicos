@@ -1,7 +1,7 @@
 /* Service worker de Patios Dinámicos.
    IMPORTANTE: al publicar cualquier cambio en index.html o en lib/,
    subir el número de VERSION para que los dispositivos se actualicen. */
-const VERSION = 'patios-v8';
+const VERSION = 'patios-v9';
 
 const APP_SHELL = [
   './',

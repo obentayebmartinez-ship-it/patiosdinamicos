@@ -875,6 +875,7 @@ body.modo-hoy .panel-hoy { display: block; }
   <div class="grupo solo-admin">Red regional</div>
   <button class="solo-admin" data-vista="vista-centros" data-titulo="Centros y patios">🗂️ Centros</button>
   <button class="solo-admin" data-vista="vista-regional" data-titulo="Panel de investigación regional">🔬 Investigación</button>
+  <button class="solo-admin" id="btn-nav-solicitudes" data-vista="vista-solicitudes" data-titulo="Solicitudes de acceso">✉️ Solicitudes</button>
   <div class="pie">
     <button id="btn-cambiar-perfil" title="Entrar con tu cuenta o cambiar de perfil">👤 Entrar</button>
     <span class="version-pie">Piloto curso 2026-27<br>Orientación educativa de La Rioja</span>
@@ -1021,6 +1022,12 @@ body.modo-hoy .panel-hoy { display: block; }
   <span class="aviso-fase" id="aviso-regional">🧪 Demostración — 3 centros ficticios con datos inventados; conéctate con la cuenta de orientación regional para ver los datos reales</span>
   <p>Datos <strong>agregados y anonimizados por defecto</strong> de los centros participantes. Ningún dato baja del nivel centro; ningún dato de alumnado individual sube aquí.</p>
   <div id="contenido-regional"></div>
+</section>
+
+<section id="vista-solicitudes" class="vista vista-mock">
+  <h2>Solicitudes de acceso a la app</h2>
+  <p>Centros que han pedido una cuenta desde la pantalla de acceso. Crea su cuenta y márcalas como atendidas.</p>
+  <div id="contenido-solicitudes"></div>
 </section>
 
 </main>
@@ -4732,6 +4739,7 @@ async function procesarLogin({ emailEl, claveEl, btn, errEl }) {
     } else if (Nube.esAdmin()) {
       avisar('Conectado como orientación regional: las vistas de la red muestran los centros reales.');
       Nube.datosRegionales(); // precargar
+      Nube.listarSolicitudes().then(s => s && actualizarBadgeSolicitudes(s.length));
     }
   } catch (err) {
     btn.disabled = false; btn.textContent = textoOrig;
@@ -4847,26 +4855,6 @@ async function pintarCentros() {
   const hayReales = !!(dReg && dReg.centros.length);
   if ($('aviso-centros')) $('aviso-centros').style.display = hayReales ? 'none' : '';
 
-  // Solicitudes de cuenta pendientes (solo admin)
-  const solicitudes = Nube.esAdmin() ? await Nube.listarSolicitudes() : null;
-  let bloqueSolicitudes = '';
-  if (solicitudes && solicitudes.length) {
-    const filas = solicitudes.map(s => `<div class="solicitud-fila">
-      <div>
-        <strong>${esc(s.centro)}</strong>
-        <span class="datos"> · <a href="mailto:${esc(s.email)}">${esc(s.email)}</a>${s.contacto ? ' · ' + esc(s.contacto) : ''}</span>
-        ${s.mensaje ? `<div class="datos" style="margin-top:2px;">“${esc(s.mensaje)}”</div>` : ''}
-        <div class="datos">${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
-      </div>
-      <button class="boton secundario pequeno" data-atender="${s.id}">✓ Atendida</button>
-    </div>`).join('');
-    bloqueSolicitudes = `<div class="tarjeta" style="border-left:4px solid var(--z-cognitiva); margin-bottom:14px;">
-      <h4 style="margin-bottom:8px;">✉️ Solicitudes de cuenta pendientes (${solicitudes.length})</h4>
-      <p class="ayuda" style="margin-bottom:8px;">Crea la cuenta en Supabase (Authentication → Users) y da de alta el centro; luego marca la solicitud como atendida.</p>
-      ${filas}
-    </div>`;
-  }
-
   // Patios reales de este dispositivo
   let itemsLocales = '';
   for (const p of (DataLayer.listarPatios() || [])) {
@@ -4891,7 +4879,7 @@ async function pintarCentros() {
       <button class="boton secundario pequeno" data-abrir-patio="${p.id}">Abrir</button></li>`;
   }
 
-  let html = bloqueSolicitudes + `<div class="rejilla-centros">
+  let html = `<div class="rejilla-centros">
     <div class="tarjeta tarjeta-centro" style="border-left-color:var(--ok)">
       <div class="cabecera-tc"><h4>🏫 Este centro</h4><span class="insignia local">este dispositivo</span></div>
       <ul>${itemsLocales || '<li><span class="datos">Sin patios definidos.</span></li>'}</ul>
@@ -4939,13 +4927,48 @@ async function pintarCentros() {
     await activarPatio(b.dataset.abrirPatio);
     document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
   }));
+}
 
+/* ---- Vista Solicitudes de acceso (solo admin) ---- */
+async function pintarSolicitudes() {
+  const cont = $('contenido-solicitudes');
+  cont.innerHTML = '<p class="ayuda">Cargando solicitudes…</p>';
+  const solicitudes = await Nube.listarSolicitudes();
+  if (solicitudes === null) {
+    cont.innerHTML = '<div class="tarjeta">No se pudieron cargar las solicitudes (¿sin conexión, o falta ejecutar el <code>schema.sql</code> en Supabase?).</div>';
+    return;
+  }
+  actualizarBadgeSolicitudes(solicitudes.length);
+  if (!solicitudes.length) {
+    cont.innerHTML = '<div class="tarjeta">No hay solicitudes pendientes. 🎉</div>';
+    return;
+  }
+  const filas = solicitudes.map(s => `<div class="solicitud-fila">
+    <div>
+      <strong>${esc(s.centro)}</strong>
+      <span class="datos"> · <a href="mailto:${esc(s.email)}">${esc(s.email)}</a>${s.contacto ? ' · ' + esc(s.contacto) : ''}</span>
+      ${s.mensaje ? `<div class="datos" style="margin-top:2px;">“${esc(s.mensaje)}”</div>` : ''}
+      <div class="datos">Solicitada el ${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+    </div>
+    <button class="boton secundario pequeno" data-atender="${s.id}">✓ Marcar atendida</button>
+  </div>`).join('');
+  cont.innerHTML = `<div class="tarjeta" style="border-left:4px solid var(--z-cognitiva);">
+    <h4 style="margin-bottom:8px;">${solicitudes.length} solicitud${solicitudes.length === 1 ? '' : 'es'} pendiente${solicitudes.length === 1 ? '' : 's'}</h4>
+    <p class="ayuda" style="margin-bottom:10px;">Para dar acceso: en Supabase crea el usuario (Authentication → Users) y da de alta el centro y su fila en <code>usuarios</code> (ver <code>schema.sql</code>); después marca la solicitud como atendida.</p>
+    ${filas}
+  </div>`;
   cont.querySelectorAll('[data-atender]').forEach(b => b.addEventListener('click', async () => {
     b.disabled = true;
     await Nube.marcarSolicitud(b.dataset.atender);
     avisar('Solicitud marcada como atendida.');
-    pintarCentros();
+    pintarSolicitudes();
   }));
+}
+
+// Contador junto al botón ✉️ Solicitudes del menú
+function actualizarBadgeSolicitudes(n) {
+  const b = $('btn-nav-solicitudes');
+  if (b) b.textContent = n ? `✉️ Solicitudes (${n})` : '✉️ Solicitudes';
 }
 
 /* ============================================================
@@ -4966,6 +4989,7 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
     if (b.dataset.vista === 'vista-panel-centro') pintarPanelCentro();
     if (b.dataset.vista === 'vista-centros') pintarCentros();
     if (b.dataset.vista === 'vista-regional') pintarPanelRegional();
+    if (b.dataset.vista === 'vista-solicitudes') pintarSolicitudes();
   });
 });
 
@@ -5007,6 +5031,7 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
         if (r === 'vacia') ofrecerSubida();
       } else if (Nube.esAdmin()) {
         Nube.datosRegionales(); // precargar para las vistas de la red
+        Nube.listarSolicitudes().then(s => s && actualizarBadgeSolicitudes(s.length));
       }
     } else if (!teniaPerfil) {
       abrirModalInicio();
