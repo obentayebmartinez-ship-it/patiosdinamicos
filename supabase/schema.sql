@@ -115,14 +115,24 @@ create table if not exists sesiones_encuesta (
 -- login (sin estar autenticado) y la solicitud queda aquí para que
 -- orientación (admin) la revise y cree la cuenta a mano.
 create table if not exists solicitudes_cuenta (
-  id       uuid primary key default gen_random_uuid(),
-  centro   text not null,
-  contacto text,
-  email    text not null,
-  mensaje  text,
-  atendida boolean not null default false,
-  creada   timestamptz not null default now()
+  id          uuid primary key default gen_random_uuid(),
+  centro      text not null,
+  contacto    text,
+  email       text not null,
+  mensaje     text,
+  tipo        text,
+  etapa       text,
+  ruralidad   text,
+  num_alumnos int,
+  atendida    boolean not null default false,
+  creada      timestamptz not null default now()
 );
+-- Datos que rellena el propio centro en su solicitud (para reejecuciones del
+-- esquema donde la tabla ya existía sin estas columnas).
+alter table solicitudes_cuenta add column if not exists tipo text;
+alter table solicitudes_cuenta add column if not exists etapa text;
+alter table solicitudes_cuenta add column if not exists ruralidad text;
+alter table solicitudes_cuenta add column if not exists num_alumnos int;
 
 -- ------------------------------------------------------------
 -- Funciones auxiliares para las políticas.

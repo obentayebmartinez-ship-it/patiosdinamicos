@@ -1152,6 +1152,14 @@ body.modo-hoy .panel-hoy { display: block; }
       </p>
       <div class="campo-nube"><label for="sol-centro">Centro *</label>
         <input type="text" id="sol-centro" maxlength="90" placeholder="ej. CEIP San Prudencio (Logroño)"></div>
+      <div class="campo-nube"><label for="sol-tipo">Tipo de centro</label>
+        <select id="sol-tipo"><option value="">—</option><option value="colegio">Colegio</option><option value="instituto">Instituto</option></select></div>
+      <div class="campo-nube"><label for="sol-etapa">Etapa educativa</label>
+        <select id="sol-etapa"><option value="">—</option><option value="EI">Infantil</option><option value="EP">Primaria</option><option value="ESO">Secundaria</option><option value="mixta">Mixta</option></select></div>
+      <div class="campo-nube"><label for="sol-ruralidad">¿Urbano o rural?</label>
+        <select id="sol-ruralidad"><option value="">—</option><option value="urbano">Urbano</option><option value="rural">Rural</option></select></div>
+      <div class="campo-nube"><label for="sol-alumnos">Nº de alumnos (opcional)</label>
+        <input type="number" id="sol-alumnos" min="0" max="9999" placeholder="ej. 450"></div>
       <div class="campo-nube"><label for="sol-contacto">Persona de contacto</label>
         <input type="text" id="sol-contacto" maxlength="90" placeholder="nombre y cargo"></div>
       <div class="campo-nube"><label for="sol-email">Correo de contacto *</label>
@@ -1723,11 +1731,14 @@ const Nube = {
 
   // Solicitud de cuenta desde el login (sin sesión): la crea cualquiera,
   // la lee/gestiona solo el admin (tabla solicitudes_cuenta con su RLS).
-  async enviarSolicitud({ centro, contacto, email, mensaje }) {
+  async enviarSolicitud({ centro, contacto, email, mensaje, tipo, etapa, ruralidad, num_alumnos }) {
     if (!this.cliente) throw new Error('La nube no está configurada en esta instalación.');
     if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
     const { error } = await this.cliente.from('solicitudes_cuenta')
-      .insert({ centro, contacto: contacto || null, email, mensaje: mensaje || null });
+      .insert({
+        centro, contacto: contacto || null, email, mensaje: mensaje || null,
+        tipo: tipo || null, etapa: etapa || null, ruralidad: ruralidad || null, num_alumnos: num_alumnos ?? null
+      });
     if (error) throw new Error('No se pudo enviar la solicitud: ' + error.message);
   },
 
@@ -4852,8 +4863,13 @@ async function enviarSolicitudCuenta() {
   const b = $('btn-sol-enviar');
   b.disabled = true; b.textContent = 'Enviando…';
   try {
-    await Nube.enviarSolicitud({ centro, contacto, email, mensaje });
-    ['sol-centro', 'sol-contacto', 'sol-email', 'sol-mensaje'].forEach(id => $(id).value = '');
+    await Nube.enviarSolicitud({
+      centro, contacto, email, mensaje,
+      tipo: $('sol-tipo').value, etapa: $('sol-etapa').value, ruralidad: $('sol-ruralidad').value,
+      num_alumnos: $('sol-alumnos').value ? +$('sol-alumnos').value : null
+    });
+    ['sol-centro', 'sol-contacto', 'sol-email', 'sol-mensaje', 'sol-alumnos'].forEach(id => $(id).value = '');
+    ['sol-tipo', 'sol-etapa', 'sol-ruralidad'].forEach(id => $(id).value = '');
     mostrarVistaInicio('login');
     avisar('Solicitud enviada. Te contactaremos por correo. ¡Gracias!');
   } catch (err) {
@@ -5344,6 +5360,8 @@ async function pintarSolicitudes() {
     <div>
       <strong>${esc(s.centro)}</strong>
       <span class="datos"> · <a href="mailto:${esc(s.email)}">${esc(s.email)}</a>${s.contacto ? ' · ' + esc(s.contacto) : ''}</span>
+      ${[s.tipo, s.etapa, s.ruralidad, s.num_alumnos != null ? s.num_alumnos + ' alumnos' : ''].filter(Boolean).length
+        ? `<div class="datos" style="margin-top:2px;">${[s.tipo, s.etapa, s.ruralidad, s.num_alumnos != null ? s.num_alumnos + ' alumnos' : ''].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
       ${s.mensaje ? `<div class="datos" style="margin-top:2px;">“${esc(s.mensaje)}”</div>` : ''}
       <div class="datos">Solicitada el ${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
     </div>
@@ -5376,7 +5394,11 @@ function abrirDarAcceso(s) {
   solicitudEnCurso = s.id || null;
   $('da-nombre').value = s.centro || '';
   $('da-email').value = s.email || '';
-  $('da-tipo').value = ''; $('da-etapa').value = ''; $('da-ruralidad').value = ''; $('da-alumnos').value = '';
+  // Prerrellenado con lo que indicó el propio centro en su solicitud
+  $('da-tipo').value = s.tipo || '';
+  $('da-etapa').value = s.etapa || '';
+  $('da-ruralidad').value = s.ruralidad || '';
+  $('da-alumnos').value = s.num_alumnos != null ? s.num_alumnos : '';
   $('da-error').textContent = '';
   $('dar-acceso-form').style.display = 'block';
   $('dar-acceso-result').style.display = 'none';
