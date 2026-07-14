@@ -23,6 +23,9 @@ create table if not exists centros (
   num_alumnos int,
   creado      timestamptz not null default now()
 );
+-- Última vez que un dispositivo del centro se conectó (lo actualiza la app al
+-- entrar). `add column if not exists` para no fallar al reejecutar el esquema.
+alter table centros add column if not exists ultima_conexion timestamptz;
 
 -- Cada usuario de Authentication se liga aquí a un centro y un rol.
 -- rol 'centro': ve y edita solo lo de su centro.

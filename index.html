@@ -1743,6 +1743,35 @@ const Nube = {
     await this.cliente.from('solicitudes_cuenta').update({ atendida: true }).eq('id', id);
   },
 
+  // Sella la última conexión del centro (fire-and-forget). Necesita la columna
+  // centros.ultima_conexion y la política centros_update_propio (ver schema.sql);
+  // si faltan, falla en silencio sin afectar al uso normal.
+  marcarConexion() {
+    if (!this.esCentro() || !this.cliente || !navigator.onLine) return;
+    this.cliente.from('centros').update({ ultima_conexion: new Date().toISOString() })
+      .eq('id', this.usuario.centro_id).then(() => {}, () => {});
+  },
+
+  // Borrar un centro con todos sus datos y cuentas (Edge Function, rol admin).
+  async borrarCentro(centroId) {
+    if (!this.esAdmin()) throw new Error('Solo un administrador puede borrar centros.');
+    if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
+    const { data, error } = await this.cliente.functions.invoke(NUBE_FUNCION_DAR_ACCESO, {
+      body: { accion: 'borrar-centro', centro_id: centroId }
+    });
+    if (error) {
+      let msg = error.message || 'No se pudo borrar.';
+      try { const c = await error.context.json(); if (c && c.error) msg = c.error; } catch (e) { /* sin cuerpo */ }
+      if (/Failed to send|Failed to fetch|not found|404|Acción no reconocida/i.test(msg)) {
+        msg = 'La función de Supabase no está actualizada (falta la acción de borrado). Vuelve a desplegar el index.ts (ver README).';
+      }
+      throw new Error(msg);
+    }
+    if (data && data.error) throw new Error(data.error);
+    this._cacheRegional = null;
+    return data;
+  },
+
   // Dar acceso a un centro: llama a la Edge Function `dar-acceso` (crea la
   // cuenta con la service_role en el servidor). Devuelve { email, tempPassword }.
   async darAcceso({ solicitudId, email, nombre, tipo, etapa, ruralidad, num_alumnos }) {
@@ -1800,6 +1829,7 @@ const Nube = {
     if (u.centro_id) {
       const r = await this.cliente.from('centros').select('*').eq('id', u.centro_id).maybeSingle();
       this.centro = r.data || null;
+      this.marcarConexion(); // sella la última conexión del centro (sin bloquear)
     }
     localStorage.setItem(this.CLAVE_CUENTA, JSON.stringify({ usuario: this.usuario, centro: this.centro }));
     return true;
@@ -5113,14 +5143,19 @@ async function pintarCentros() {
         const area = per && per.properties.area_m2 ? ' · ' + formatearArea(per.properties.area_m2) : '';
         return `<li>🏞️ <strong>${esc(p.nombre)}</strong> <span class="datos">${nZonas} zona${nZonas === 1 ? '' : 's'}${area}</span></li>`;
       }).join('');
+      const ultConexion = c.ultima_conexion || ultimaActividadCentro(c.id, dReg);
       html += `<div class="tarjeta tarjeta-centro" style="border-left-color:${color}">
         <div class="cabecera-tc"><h4>${esc(c.nombre)}</h4><span class="insignia">☁️ nube</span></div>
         <ul>
           <li><span class="datos">${esc(c.etapa || '—')} · ${esc(c.ruralidad || '—')} · ${c.num_alumnos ? c.num_alumnos + ' alumnos' : 'alumnado sin indicar'}</span></li>
           ${itemsPatios || '<li><span class="datos">Sin patios dibujados todavía.</span></li>'}
           <li><span class="datos">Incidencias últimos 7 días: <strong>${inc7}</strong></span></li>
+          <li><span class="datos">Última conexión: <strong>${ultConexion ? haceCuanto(ultConexion) : 'sin registro'}</strong></span></li>
         </ul>
-        <button class="boton secundario pequeno" data-detalle="${c.id}">🔍 Supervisar</button>
+        <div class="acciones">
+          <button class="boton secundario pequeno" data-detalle="${c.id}">🔍 Supervisar</button>
+          <button class="boton secundario pequeno" data-borrar="${c.id}" data-nombre="${esc(c.nombre)}">🗑️ Borrar</button>
+        </div>
       </div>`;
     }
   } else {
@@ -5144,6 +5179,52 @@ async function pintarCentros() {
     document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
   }));
   cont.querySelectorAll('[data-detalle]').forEach(b => b.addEventListener('click', () => pintarDetalleCentro(b.dataset.detalle)));
+
+  // Borrar centro: dos toques (el primero arma, el segundo ejecuta)
+  cont.querySelectorAll('[data-borrar]').forEach(b => {
+    let armado = false, t = null;
+    b.addEventListener('click', async () => {
+      if (!armado) {
+        armado = true;
+        b.textContent = '¿Seguro? Borra TODO el centro';
+        b.classList.add('peligro');
+        t = setTimeout(() => { armado = false; b.textContent = '🗑️ Borrar'; b.classList.remove('peligro'); }, 4500);
+        return;
+      }
+      clearTimeout(t);
+      b.disabled = true; b.textContent = 'Borrando…';
+      try {
+        await Nube.borrarCentro(b.dataset.borrar);
+        avisar(`Centro "${b.dataset.nombre}" borrado con todos sus datos y cuentas.`);
+        pintarCentros();
+      } catch (e) {
+        b.disabled = false; armado = false; b.textContent = '🗑️ Borrar'; b.classList.remove('peligro');
+        avisar('No se pudo borrar: ' + e.message);
+      }
+    });
+  });
+}
+
+// Última conexión conocida de un centro: la sellada por la app o, si no,
+// la marca más reciente de su actividad (patio guardado, incidencia, etc.).
+function ultimaActividadCentro(id, d) {
+  const ts = [];
+  d.patios.filter(p => p.centro_id === id).forEach(p => { if (p.actualizado) ts.push(p.actualizado); });
+  [d.incidencias, d.ocupaciones, d.encuestas].forEach(arr =>
+    arr.filter(x => x.centro_id === id).forEach(x => { if (x.creado) ts.push(x.creado); }));
+  return ts.length ? ts.sort().at(-1) : null;
+}
+
+// "hoy" / "ayer" / "hace N días" / fecha
+function haceCuanto(iso) {
+  const f = new Date(iso), ahora = new Date();
+  const dia = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const dias = Math.round((hoy - dia) / 864e5);
+  if (dias <= 0) return 'hoy';
+  if (dias === 1) return 'ayer';
+  if (dias < 7) return 'hace ' + dias + ' días';
+  return f.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /* ---- Ficha de supervisión de un centro (solo lectura, rol admin) ---- */

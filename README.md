@@ -121,6 +121,20 @@ Mientras no esté desplegada, la app avisa con un mensaje claro y siempre queda 
 alta manual: crear el usuario en Authentication → Users e insertar en
 `centros`/`usuarios` (ver arriba), y luego **Descartar** la solicitud.
 
+La misma función maneja también **borrar un centro** (botón 🗑️ Borrar en la vista
+Centros): elimina el centro con todos sus datos (patios, incidencias, ocupación,
+encuestas — por `on delete cascade`) y las cuentas de acceso asociadas. Si ya
+tenías la función desplegada de antes, **vuelve a pegar `index.ts` y Deploy** para
+que incluya la acción de borrado.
+
+#### Última conexión de los centros
+
+Las tarjetas de la vista Centros muestran la **última conexión** de cada centro.
+La app la sella (`centros.ultima_conexion`) cuando un dispositivo del centro entra;
+si esa columna aún no existe, se usa como aproximación la última actividad
+registrada (patio guardado, incidencia, etc.). La columna se crea al ejecutar
+`schema.sql` (`alter table centros add column if not exists ultima_conexion …`).
+
 ### Esquema y decisiones
 
 - El esquema vive en [supabase/schema.sql](supabase/schema.sql): `centros`,
