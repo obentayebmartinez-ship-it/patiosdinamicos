@@ -1624,6 +1624,10 @@ const DataLayer = {
 // La clave "anon" es pública por diseño: la seguridad la pone el RLS.
 const NUBE_URL = 'https://dbhavtzfikekuqtburar.supabase.co';
 const NUBE_CLAVE_ANON = 'sb_publishable__CcLxt1Xiimx2LaRUZnpmA__pkWtaEi';
+// Nombre (slug) de la Edge Function que crea cuentas de centro. Debe coincidir
+// EXACTO con el nombre en Supabase → Edge Functions. La desplegada se llamó
+// 'rapid-handler' (nombre por defecto); su código es el de dar-acceso/index.ts.
+const NUBE_FUNCION_DAR_ACCESO = 'rapid-handler';
 
 const Nube = {
   cliente: null,
@@ -1698,7 +1702,7 @@ const Nube = {
   async darAcceso({ solicitudId, email, nombre, tipo, etapa, ruralidad, num_alumnos }) {
     if (!this.esAdmin()) throw new Error('Solo un administrador puede dar acceso.');
     if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
-    const { data, error } = await this.cliente.functions.invoke('dar-acceso', {
+    const { data, error } = await this.cliente.functions.invoke(NUBE_FUNCION_DAR_ACCESO, {
       body: { solicitud_id: solicitudId || null, email, nombre, tipo, etapa, ruralidad, num_alumnos }
     });
     if (error) {
