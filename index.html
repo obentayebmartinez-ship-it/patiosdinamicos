@@ -339,6 +339,27 @@ button.enlace {
   font-weight: 700; font-size: 13px; cursor: pointer; padding: 2px; text-decoration: underline;
 }
 .pie-nube-cuenta { font-size: 12.5px; color: var(--tinta-suave); margin-top: 4px; }
+
+/* ---------- Tutorial (diapositivas de bienvenida) ---------- */
+#velo-tutorial { z-index: 2200; } /* por encima del modal de acceso */
+.modal-tutorial { width: min(440px, 94vw); padding: 0; overflow: hidden; }
+.tuto-ilustracion {
+  height: 190px; display: flex; align-items: center; justify-content: center; position: relative;
+  font-size: 78px; line-height: 1; transition: background .3s;
+}
+.tuto-ilustracion .globo {
+  width: 128px; height: 128px; border-radius: 50%; background: rgba(255,255,255,.85);
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(35,45,54,.18);
+}
+.tuto-cuerpo { padding: 20px 22px 6px; }
+.tuto-cuerpo h2 { font-family: var(--fuente-titulo); font-size: 20px; margin-bottom: 8px; }
+.tuto-cuerpo p { font-size: 14px; color: var(--tinta-suave); line-height: 1.5; min-height: 63px; }
+.tuto-puntos { display: flex; gap: 7px; justify-content: center; padding: 6px 0 2px; }
+.tuto-puntos span { width: 8px; height: 8px; border-radius: 50%; background: var(--hormigon-2); transition: background .2s, transform .2s; }
+.tuto-puntos span.activo { background: var(--asfalto); transform: scale(1.3); }
+.tuto-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px 20px; }
+.tuto-nav .boton.pequeno { min-width: 104px; }
+#tuto-prev[disabled] { visibility: hidden; }
 .solicitud-fila {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 9px 0; border-top: 1px solid var(--hormigon-2); font-size: 13px;
@@ -1111,7 +1132,8 @@ body.modo-hoy .panel-hoy { display: block; }
         ¿Tu centro quiere participar? <button class="enlace" id="btn-ver-solicitud">Solicitar una cuenta</button>
       </p>
       <p style="font-size:12px; color:var(--tinta-suave); text-align:center; margin-top:4px;">
-        o <button class="enlace" id="btn-ver-demo">explorar en modo demostración</button>
+        <button class="enlace" id="btn-ver-tutorial">📖 Ver tutorial</button>
+        · <button class="enlace" id="btn-ver-demo">explorar en modo demostración</button>
       </p>
     </div>
     <!-- Solicitar una cuenta -->
@@ -1150,6 +1172,23 @@ body.modo-hoy .panel-hoy { display: block; }
       <p style="text-align:center; margin-top:16px;">
         <button class="enlace" id="btn-volver-login">← Volver a entrar con cuenta</button>
       </p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Modal: tutorial (diapositivas) ===================== -->
+<div class="velo" id="velo-tutorial">
+  <div class="modal modal-tutorial">
+    <div class="tuto-ilustracion" id="tuto-ilustracion"><div class="globo" id="tuto-emoji">🎉</div></div>
+    <div class="tuto-cuerpo">
+      <h2 id="tuto-titulo"></h2>
+      <p id="tuto-texto"></p>
+    </div>
+    <div class="tuto-puntos" id="tuto-puntos"></div>
+    <div class="tuto-nav">
+      <button class="boton secundario pequeno" id="tuto-prev">← Anterior</button>
+      <button class="enlace" id="tuto-saltar">Saltar</button>
+      <button class="boton pequeno" id="tuto-next">Siguiente →</button>
     </div>
   </div>
 </div>
@@ -4893,6 +4932,72 @@ $('btn-ver-solicitud').addEventListener('click', () => { $('sol-error').textCont
 $('btn-sol-volver').addEventListener('click', () => mostrarVistaInicio('login'));
 $('btn-volver-login').addEventListener('click', () => mostrarVistaInicio('login'));
 $('btn-sol-enviar').addEventListener('click', enviarSolicitudCuenta);
+
+/* ============================================================
+   TUTORIAL — diapositivas de bienvenida (se abre desde el login)
+   ============================================================ */
+const PASOS_TUTORIAL = [
+  { emoji: '🎉', color: 'var(--z-otra)', titulo: '¡Bienvenido/a!',
+    texto: 'Patios Dinámicos ayuda a tu centro a organizar el recreo por zonas para una convivencia más inclusiva. Te lo contamos en un minuto.' },
+  { emoji: '🗺️', color: 'var(--z-lectura)', titulo: 'Dibuja tu patio',
+    texto: 'Sobre el mapa por satélite, marca el contorno del patio y divídelo en zonas: deportiva, lectura y calma, juegos, creativa…' },
+  { emoji: '🔄', color: 'var(--z-deportiva)', titulo: 'Planifica la rotación',
+    texto: 'Asigna qué grupo va a cada zona cada día de la semana. La app puede generar la rotación automáticamente con un toque.' },
+  { emoji: '📝', color: 'var(--aviso)', titulo: 'Registra incidencias',
+    texto: 'Desde el móvil, durante la guardia: zona, tipo, curso y gravedad en cuatro toques. Siempre por grupo, nunca por alumno.' },
+  { emoji: '🙌', color: 'var(--z-cognitiva)', titulo: 'Mide la ocupación',
+    texto: 'Un vistazo al patio y marcas cómo de llena está cada zona. Así ves cuáles funcionan y cuáles se quedan vacías.' },
+  { emoji: '💬', color: 'var(--z-lectura)', titulo: 'Encuestas de bienestar',
+    texto: 'Pásalas por kiosco (el dispositivo va de mano en mano) o en papel. Anónimas y agregadas por curso.' },
+  { emoji: '📊', color: 'var(--z-deportiva)', titulo: 'Tu panel',
+    texto: 'Todo lo que registras se convierte en gráficos claros para ver la evolución y tomar decisiones.' },
+  { emoji: '☁️', color: 'var(--z-otra)', titulo: 'Entra con tu cuenta',
+    texto: 'Con la cuenta del centro, todos vuestros dispositivos ven lo mismo. ¿Aún no tenéis? Pulsa “Solicitar una cuenta” en la pantalla de acceso.' }
+];
+let tutorialIdx = 0;
+
+function pintarTutorialPaso() {
+  const p = PASOS_TUTORIAL[tutorialIdx];
+  $('tuto-ilustracion').style.background = p.color;
+  $('tuto-emoji').textContent = p.emoji;
+  $('tuto-titulo').textContent = p.titulo;
+  $('tuto-texto').textContent = p.texto;
+  $('tuto-puntos').innerHTML = PASOS_TUTORIAL.map((_, i) =>
+    `<span class="${i === tutorialIdx ? 'activo' : ''}"></span>`).join('');
+  $('tuto-prev').disabled = tutorialIdx === 0;
+  const ultimo = tutorialIdx === PASOS_TUTORIAL.length - 1;
+  $('tuto-next').textContent = ultimo ? '¡Empezar!' : 'Siguiente →';
+  $('tuto-saltar').style.visibility = ultimo ? 'hidden' : 'visible';
+}
+function abrirTutorial() { tutorialIdx = 0; pintarTutorialPaso(); $('velo-tutorial').classList.add('visible'); }
+function cerrarTutorial() { $('velo-tutorial').classList.remove('visible'); }
+function tutorialAvanzar(d) {
+  const n = tutorialIdx + d;
+  if (n < 0) return;
+  if (n >= PASOS_TUTORIAL.length) { cerrarTutorial(); return; }
+  tutorialIdx = n; pintarTutorialPaso();
+}
+
+$('btn-ver-tutorial').addEventListener('click', abrirTutorial);
+$('tuto-next').addEventListener('click', () => tutorialAvanzar(1));
+$('tuto-prev').addEventListener('click', () => tutorialAvanzar(-1));
+$('tuto-saltar').addEventListener('click', cerrarTutorial);
+document.addEventListener('keydown', e => {
+  if (!$('velo-tutorial').classList.contains('visible')) return;
+  if (e.key === 'ArrowRight') tutorialAvanzar(1);
+  else if (e.key === 'ArrowLeft') tutorialAvanzar(-1);
+  else if (e.key === 'Escape') cerrarTutorial();
+});
+// Deslizar con el dedo (móvil)
+let tutoX0 = null;
+$('velo-tutorial').addEventListener('pointerdown', e => { tutoX0 = e.clientX; });
+$('velo-tutorial').addEventListener('pointerup', e => {
+  if (tutoX0 === null) return;
+  const dx = e.clientX - tutoX0; tutoX0 = null;
+  if (Math.abs(dx) > 45) tutorialAvanzar(dx < 0 ? 1 : -1);
+});
+// Cerrar tocando fuera del recuadro
+$('velo-tutorial').addEventListener('click', e => { if (e.target === $('velo-tutorial')) cerrarTutorial(); });
 $('perfil-eleccion-centro').addEventListener('click', () => aplicarPerfil('centro'));
 $('btn-cambiar-perfil').addEventListener('click', abrirModalInicio);
 
