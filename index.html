@@ -367,6 +367,13 @@ button.enlace {
 .solicitud-fila:first-of-type { border-top: none; }
 .solicitud-fila .acciones { display: flex; gap: 6px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
 .credenciales { display: grid; gap: 10px; margin: 12px 0; }
+.rejilla-detalle-patios { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.zonas-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip-zona {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700;
+  background: var(--hormigon); border: 1px solid var(--hormigon-2); border-radius: 999px; padding: 3px 9px;
+}
+.chip-zona .punto { width: 10px; height: 10px; border-radius: 50%; }
 .credenciales .cred-valor {
   font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; color: var(--tinta);
   background: var(--hormigon); border: 1px solid var(--hormigon-2); border-radius: 8px; padding: 8px 11px; margin-top: 3px;
@@ -5113,6 +5120,7 @@ async function pintarCentros() {
           ${itemsPatios || '<li><span class="datos">Sin patios dibujados todavía.</span></li>'}
           <li><span class="datos">Incidencias últimos 7 días: <strong>${inc7}</strong></span></li>
         </ul>
+        <button class="boton secundario pequeno" data-detalle="${c.id}">🔍 Supervisar</button>
       </div>`;
     }
   } else {
@@ -5135,6 +5143,105 @@ async function pintarCentros() {
     await activarPatio(b.dataset.abrirPatio);
     document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
   }));
+  cont.querySelectorAll('[data-detalle]').forEach(b => b.addEventListener('click', () => pintarDetalleCentro(b.dataset.detalle)));
+}
+
+/* ---- Ficha de supervisión de un centro (solo lectura, rol admin) ---- */
+// Mini-plano SVG de las zonas de un patio a partir de su GeoJSON (sin mapa).
+function miniMapaZonas(fc, w = 300, h = 190) {
+  const feats = (fc && fc.features) || [];
+  const per = feats.find(f => f.properties && f.properties.rol === 'perimetro');
+  const zonas = feats.filter(f => f.properties && f.properties.rol === 'zona');
+  const anillos = f => {
+    const g = f.geometry || {};
+    if (g.type === 'Polygon') return g.coordinates;
+    if (g.type === 'MultiPolygon') return g.coordinates.flat();
+    return [];
+  };
+  const todos = [per, ...zonas].filter(Boolean);
+  if (!todos.length) return '<div class="datos">Sin plano dibujado todavía.</div>';
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const f of todos) for (const ring of anillos(f)) for (const c of ring) {
+    if (c[0] < minX) minX = c[0]; if (c[0] > maxX) maxX = c[0];
+    if (c[1] < minY) minY = c[1]; if (c[1] > maxY) maxY = c[1];
+  }
+  const pad = 8, escala = Math.min((w - 2 * pad) / ((maxX - minX) || 1), (h - 2 * pad) / ((maxY - minY) || 1));
+  const anchoReal = (maxX - minX) * escala, altoReal = (maxY - minY) * escala;
+  const offX = (w - anchoReal) / 2, offY = (h - altoReal) / 2;
+  const px = x => offX + (x - minX) * escala;
+  const py = y => h - offY - (y - minY) * escala; // eje Y invertido (norte arriba)
+  const poligonos = (f, fill, stroke, op) => anillos(f).map(ring =>
+    `<polygon points="${ring.map(c => `${px(c[0]).toFixed(1)},${py(c[1]).toFixed(1)}`).join(' ')}" fill="${fill}" fill-opacity="${op}" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/>`).join('');
+  let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#f4f6f4;border-radius:8px;" role="img">`;
+  if (per) svg += poligonos(per, '#dfe6e0', '#8b96a0', 0.5);
+  for (const z of zonas) { const col = (z.properties && z.properties.color) || '#3e7cb1'; svg += poligonos(z, col, col, 0.55); }
+  return svg + '</svg>';
+}
+
+async function pintarDetalleCentro(centroId) {
+  const cont = $('contenido-centros');
+  cont.innerHTML = '<p class="ayuda">Cargando centro…</p>';
+  const d = await Nube.datosRegionales();
+  const c = d && d.centros.find(x => x.id === centroId);
+  if (!c) { cont.innerHTML = '<div class="tarjeta">No se pudo cargar el centro.</div>'; return; }
+
+  const incs = d.incidencias.filter(i => i.centro_id === centroId);
+  const ocs = d.ocupaciones.filter(o => o.centro_id === centroId);
+  const encs = d.encuestas.filter(e => e.centro_id === centroId);
+  const pats = d.patios.filter(p => p.centro_id === centroId);
+  const desde30 = fechaHaceDias(29);
+  const inc30 = incs.filter(i => i.fecha >= desde30);
+
+  const cuenta = (arr, campo) => arr.reduce((m, x) => (m[x[campo]] = (m[x[campo]] || 0) + 1, m), {});
+  const porTipo = cuenta(inc30, 'tipo');
+  const ETIQ_TIPO = { conflicto: '⚡ Conflicto', exclusion: '😔 Exclusión', otro: '❓ Otro' };
+  const porGrav = cuenta(inc30, 'gravedad');
+
+  // Ocupación media global (niveles 0-3 → %)
+  const niveles = ocs.flatMap(o => Object.values(o.niveles || {})).filter(v => typeof v === 'number');
+  const ocupMedia = niveles.length ? Math.round((niveles.reduce((s, v) => s + v, 0) / niveles.length / 3) * 100) : null;
+
+  // Bienestar alumnado por trimestre
+  const bienTri = tri => {
+    const p = encs.filter(e => e.trimestre === tri && e.tipo_respondente === 'alumnado' && e.puntuacion != null).map(e => Number(e.puntuacion));
+    return p.length ? (p.reduce((s, v) => s + v, 0) / p.length) : null;
+  };
+
+  const patiosHtml = pats.length ? pats.map(p => {
+    const zonas = ((p.geojson || {}).features || []).filter(f => f.properties && f.properties.rol === 'zona');
+    const listaZonas = zonas.map(z => `<span class="chip-zona"><span class="punto" style="background:${(z.properties.color) || '#3e7cb1'}"></span>${esc(z.properties.nombre || TIPOS_ZONA[z.properties.tipo] && TIPOS_ZONA[z.properties.tipo].etiqueta || 'Zona')}</span>`).join('');
+    return `<div class="tarjeta">
+      <h4>🏞️ ${esc(p.nombre)}</h4>
+      ${miniMapaZonas(p.geojson)}
+      <div class="zonas-chips">${listaZonas || '<span class="datos">Sin zonas.</span>'}</div>
+    </div>`;
+  }).join('') : '<div class="tarjeta"><span class="datos">Este centro aún no ha dibujado ningún patio.</span></div>';
+
+  const filasGrav = [1, 2, 3].map(g => `${['', 'Leve', 'Media', 'Alta'][g]}: <strong>${porGrav[g] || 0}</strong>`).join(' · ');
+
+  cont.innerHTML = `
+    <button class="boton secundario pequeno" id="volver-centros">← Volver a centros</button>
+    <div class="detalle-centro">
+      <h3 style="margin:12px 0 2px;">${esc(c.nombre)}</h3>
+      <p class="ayuda">${esc(c.etapa || '—')} · ${esc(c.ruralidad || '—')} · ${c.num_alumnos ? c.num_alumnos + ' alumnos' : 'alumnado sin indicar'} · <span class="insignia">solo lectura</span></p>
+
+      <div class="panel-kpis" style="margin-top:12px;">
+        <div class="tile-dato"><div class="etiq">Incidencias · últimos 30 días</div><div class="valor">${inc30.length}</div></div>
+        <div class="tile-dato"><div class="etiq">Ocupación media</div><div class="valor">${ocupMedia == null ? '–' : ocupMedia}<small> %</small></div></div>
+        <div class="tile-dato"><div class="etiq">Bienestar alumnado · último tri.</div><div class="valor">${numComa(bienTri('T3') ?? bienTri('T2') ?? bienTri('T1'))}<small> /5</small></div></div>
+        <div class="tile-dato"><div class="etiq">Patios</div><div class="valor">${pats.length}</div></div>
+      </div>
+
+      <div class="grafico-tarjeta" style="margin-top:12px;">
+        <h4>Incidencias últimos 30 días</h4>
+        <p class="datos">Por tipo: ${Object.keys(porTipo).length ? Object.entries(porTipo).map(([t, n]) => `${ETIQ_TIPO[t] || t}: <strong>${n}</strong>`).join(' · ') : 'ninguna'}</p>
+        <p class="datos">Por gravedad: ${filasGrav}</p>
+      </div>
+
+      <h4 style="margin:16px 0 6px;">Patios y zonas</h4>
+      <div class="rejilla-detalle-patios">${patiosHtml}</div>
+    </div>`;
+  $('volver-centros').addEventListener('click', pintarCentros);
 }
 
 /* ---- Vista Solicitudes de acceso (solo admin) ---- */
