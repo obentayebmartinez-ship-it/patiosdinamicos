@@ -837,7 +837,9 @@ body.modo-hoy .panel-hoy { display: block; }
 }
 </style>
 </head>
-<body>
+<!-- Por defecto se oculta el menú regional (Centros / Investigación): es
+     privado y solo aparece al entrar con la cuenta de orientación regional. -->
+<body class="perfil-centro">
 
 <!-- ===================== Logo ===================== -->
 <div class="logo-caja">
@@ -875,7 +877,7 @@ body.modo-hoy .panel-hoy { display: block; }
   <button class="solo-admin" data-vista="vista-regional" data-titulo="Panel de investigación regional">🔬 Investigación</button>
   <div class="pie">
     <button id="btn-cambiar-perfil" title="Entrar con tu cuenta o cambiar de perfil">👤 Entrar</button>
-    <span class="version-pie">Piloto 2026-27 · v0.1<br>Orientación educativa de La Rioja</span>
+    <span class="version-pie">Piloto curso 2026-27<br>Orientación educativa de La Rioja</span>
   </div>
 </nav>
 
@@ -1129,9 +1131,8 @@ body.modo-hoy .panel-hoy { display: block; }
         Sin cuenta: los datos se guardan <strong>solo en este dispositivo</strong> y no se envían a ningún sitio.
         Ideal para probar la app antes de solicitar una cuenta.
       </p>
-      <div class="botonera-grande" style="grid-template-columns:1fr 1fr;">
-        <button id="perfil-eleccion-centro"><span class="ic">🏫</span>Equipo del centro</button>
-        <button id="perfil-eleccion-admin"><span class="ic">🔬</span>Vista regional (demo)</button>
+      <div class="botonera-grande" style="grid-template-columns:1fr;">
+        <button id="perfil-eleccion-centro"><span class="ic">🏫</span>Probar como equipo del centro</button>
       </div>
       <p style="text-align:center; margin-top:16px;">
         <button class="enlace" id="btn-volver-login">← Volver a entrar con cuenta</button>
@@ -4662,6 +4663,7 @@ function pintarNube() {
   }
   $('btn-nube-salir').addEventListener('click', async () => {
     await Nube.salir();
+    document.body.classList.add('perfil-centro'); // ocultar de nuevo el menú regional
     pintarNube();
     pintarCabeceraCentro();
     abrirModalInicio(); // volver a la pantalla grande de acceso
@@ -4778,7 +4780,8 @@ let perfilActual = null;
 function aplicarPerfil(p) {
   perfilActual = p;
   localStorage.setItem(CLAVE_PERFIL, p);
-  document.body.classList.toggle('perfil-centro', p === 'centro');
+  // El menú regional (Centros / Investigación) solo se ve con perfil admin.
+  document.body.classList.toggle('perfil-centro', p !== 'admin');
   // Si el centro estaba en una vista de admin, volver al editor
   if (p === 'centro') {
     const visible = document.querySelector('.vista.visible');
@@ -4813,7 +4816,6 @@ $('btn-sol-volver').addEventListener('click', () => mostrarVistaInicio('login'))
 $('btn-volver-login').addEventListener('click', () => mostrarVistaInicio('login'));
 $('btn-sol-enviar').addEventListener('click', enviarSolicitudCuenta);
 $('perfil-eleccion-centro').addEventListener('click', () => aplicarPerfil('centro'));
-$('perfil-eleccion-admin').addEventListener('click', () => aplicarPerfil('admin'));
 $('btn-cambiar-perfil').addEventListener('click', abrirModalInicio);
 
 /* ---- Modal: nombre del centro ---- */
@@ -4976,9 +4978,12 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
   const guardado = await DataLayer.cargarPatio();
   if (guardado) cargarDesdeGeoJSON(guardado);
   refrescarTodo();
+  // Solo se restaura el perfil de centro (demo). El acceso regional/admin
+  // exige sesión de nube real; un 'admin' guardado de una demo anterior se
+  // ignora para que el menú regional no aparezca sin iniciar sesión.
   const perfilGuardado = localStorage.getItem(CLAVE_PERFIL);
-  const teniaPerfil = perfilGuardado === 'centro' || perfilGuardado === 'admin';
-  if (teniaPerfil) aplicarPerfil(perfilGuardado);
+  const teniaPerfil = perfilGuardado === 'centro';
+  if (teniaPerfil) aplicarPerfil('centro');
   pintarCabeceraCentro();
   pintarNube();
 
