@@ -87,16 +87,39 @@ En el primer inicio de sesión de un centro cuya nube está vacía, la app ofrec
 "⬆️ Subir este dispositivo" para volcar todo lo local (este es el traspaso que
 antes se hacía con la copia completa).
 
-### Solicitudes de cuenta
+### Solicitudes de cuenta y alta de centros
 
-En el cuadro de acceso, un centro interesado puede pulsar **"Solicitar una
-cuenta"** y rellenar un formulario (centro, contacto, correo, mensaje). La
-petición se guarda en la tabla `solicitudes_cuenta` — cualquiera puede crearla
-sin estar autenticado, pero solo el rol admin puede leerla. El admin las ve en
-la vista **🗂️ Centros** ("Solicitudes de cuenta pendientes"), crea la cuenta a
-mano (Authentication → Users + inserts de `centros`/`usuarios`) y pulsa
-**✓ Atendida**. El rol admin (orientación regional) es el panel de investigación
-privado; los centros solo usan su propia cuenta.
+En el cuadro de acceso, un centro interesado pulsa **"Solicitar una cuenta"** y
+rellena un formulario (centro, contacto, correo, mensaje). La petición se guarda
+en la tabla `solicitudes_cuenta` — cualquiera puede crearla sin estar
+autenticado, pero solo el rol admin puede leerla. El admin (orientación regional,
+panel privado) las ve en la vista **✉️ Solicitudes**.
+
+Desde ahí, **"✓ Dar acceso"** crea la cuenta del centro directamente desde la
+app: rellena/confirma los datos del centro y la app crea el usuario, da de alta
+el centro, los enlaza y marca la solicitud como atendida; devuelve una
+**contraseña temporal** para pasársela al centro. **"Descartar"** solo quita la
+solicitud (spam/duplicada).
+
+#### Desplegar la Edge Function `dar-acceso` (una vez)
+
+El botón "Dar acceso" necesita una función servidor, porque crear cuentas usa la
+*service_role* (clave maestra) que **no puede vivir en el navegador**. El código
+está en [supabase/functions/dar-acceso/index.ts](supabase/functions/dar-acceso/index.ts).
+
+Para desplegarla sin instalar nada:
+
+1. Supabase → **Edge Functions** → **Deploy a new function** (o *Create function*).
+2. Nombre exacto: **`dar-acceso`**.
+3. Pega el contenido de `supabase/functions/dar-acceso/index.ts` y pulsa **Deploy**.
+4. No hay que configurar secretos: `SUPABASE_URL`, `SUPABASE_ANON_KEY` y
+   `SUPABASE_SERVICE_ROLE_KEY` ya vienen inyectados en las Edge Functions.
+
+(Alternativa con CLI: `supabase functions deploy dar-acceso`.)
+
+Mientras no esté desplegada, la app avisa con un mensaje claro y siempre queda el
+alta manual: crear el usuario en Authentication → Users e insertar en
+`centros`/`usuarios` (ver arriba), y luego **Descartar** la solicitud.
 
 ### Esquema y decisiones
 

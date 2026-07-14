@@ -344,7 +344,13 @@ button.enlace {
   padding: 9px 0; border-top: 1px solid var(--hormigon-2); font-size: 13px;
 }
 .solicitud-fila:first-of-type { border-top: none; }
-.solicitud-fila button { flex: none; }
+.solicitud-fila .acciones { display: flex; gap: 6px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.credenciales { display: grid; gap: 10px; margin: 12px 0; }
+.credenciales .cred-valor {
+  font-family: ui-monospace, monospace; font-size: 15px; font-weight: 700; color: var(--tinta);
+  background: var(--hormigon); border: 1px solid var(--hormigon-2); border-radius: 8px; padding: 8px 11px; margin-top: 3px;
+  user-select: all; word-break: break-all;
+}
 .modal textarea { font-family: ui-monospace, monospace; font-size: 11.5px; min-height: 220px; }
 .modal .pie-modal { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 .selector-tipos { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 4px; }
@@ -1148,6 +1154,45 @@ body.modo-hoy .panel-hoy { display: block; }
   </div>
 </div>
 
+<!-- ===================== Modal: dar acceso a un centro ===================== -->
+<div class="velo" id="velo-dar-acceso">
+  <div class="modal">
+    <div id="dar-acceso-form">
+      <h2>Dar acceso a un centro</h2>
+      <p style="font-size:12.5px; color:var(--tinta-suave);">Se creará la cuenta y el centro, y se marcará la solicitud como atendida. Te daremos una contraseña temporal para pasársela al centro.</p>
+      <label>Nombre del centro *</label>
+      <input type="text" id="da-nombre" maxlength="90" placeholder="ej. CEIP San Prudencio (Logroño)">
+      <label>Correo (será su usuario para entrar) *</label>
+      <input type="email" id="da-email" placeholder="centro@ejemplo.org">
+      <label>Tipo</label>
+      <select id="da-tipo"><option value="">—</option><option value="colegio">Colegio</option><option value="instituto">Instituto</option></select>
+      <label>Etapa</label>
+      <select id="da-etapa"><option value="">—</option><option value="EI">Infantil</option><option value="EP">Primaria</option><option value="ESO">Secundaria</option><option value="mixta">Mixta</option></select>
+      <label>Ruralidad</label>
+      <select id="da-ruralidad"><option value="">—</option><option value="urbano">Urbano</option><option value="rural">Rural</option></select>
+      <label>Nº de alumnos (opcional)</label>
+      <input type="number" id="da-alumnos" min="0" max="9999">
+      <div class="login-error" id="da-error"></div>
+      <div class="pie-modal">
+        <button class="boton secundario" id="da-cancelar">Cancelar</button>
+        <button class="boton" id="da-crear">Crear cuenta y dar acceso</button>
+      </div>
+    </div>
+    <div id="dar-acceso-result" style="display:none;">
+      <h2>✅ Acceso concedido</h2>
+      <p style="font-size:12.5px; color:var(--tinta-suave);">Envía estas credenciales al centro (por correo, teléfono…). Podrá entrar en la app con ellas.</p>
+      <div class="credenciales">
+        <div><span class="datos">Correo</span><div class="cred-valor" id="da-r-email"></div></div>
+        <div><span class="datos">Contraseña temporal</span><div class="cred-valor" id="da-r-pass"></div></div>
+      </div>
+      <div class="pie-modal">
+        <button class="boton secundario" id="da-copiar">📋 Copiar credenciales</button>
+        <button class="boton" id="da-cerrar">Hecho</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== Modal: nombre del centro ===================== -->
 <div class="velo" id="velo-nombre-centro">
   <div class="modal">
@@ -1646,6 +1691,27 @@ const Nube = {
   async marcarSolicitud(id) {
     if (!this.esAdmin()) return;
     await this.cliente.from('solicitudes_cuenta').update({ atendida: true }).eq('id', id);
+  },
+
+  // Dar acceso a un centro: llama a la Edge Function `dar-acceso` (crea la
+  // cuenta con la service_role en el servidor). Devuelve { email, tempPassword }.
+  async darAcceso({ solicitudId, email, nombre, tipo, etapa, ruralidad, num_alumnos }) {
+    if (!this.esAdmin()) throw new Error('Solo un administrador puede dar acceso.');
+    if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
+    const { data, error } = await this.cliente.functions.invoke('dar-acceso', {
+      body: { solicitud_id: solicitudId || null, email, nombre, tipo, etapa, ruralidad, num_alumnos }
+    });
+    if (error) {
+      let msg = error.message || 'No se pudo dar acceso.';
+      try { const c = await error.context.json(); if (c && c.error) msg = c.error; } catch (e) { /* sin cuerpo JSON */ }
+      if (/Failed to send|Failed to fetch|not found|404/i.test(msg)) {
+        msg = 'La función "dar-acceso" no está desplegada todavía en Supabase (ver README).';
+      }
+      throw new Error(msg);
+    }
+    if (data && data.error) throw new Error(data.error);
+    this._cacheRegional = null; // el nuevo centro aparecerá en las vistas regionales
+    return data;
   },
 
   // Cambiar el nombre del propio centro (rol centro). Requiere la política
@@ -4845,6 +4911,39 @@ $('nombre-centro-guardar').addEventListener('click', async () => {
 });
 $('nombre-centro-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('nombre-centro-guardar').click(); });
 
+/* ---- Modal: dar acceso ---- */
+$('da-cancelar').addEventListener('click', () => $('velo-dar-acceso').classList.remove('visible'));
+$('da-cerrar').addEventListener('click', () => { $('velo-dar-acceso').classList.remove('visible'); pintarSolicitudes(); });
+$('da-copiar').addEventListener('click', async () => {
+  const texto = `Patios Dinámicos · acceso de tu centro\nWeb: ${location.origin}\nCorreo: ${$('da-r-email').textContent}\nContraseña temporal: ${$('da-r-pass').textContent}`;
+  try { await navigator.clipboard.writeText(texto); avisar('Credenciales copiadas al portapapeles.'); }
+  catch (e) { avisar('Copia manualmente: no se pudo acceder al portapapeles.'); }
+});
+$('da-crear').addEventListener('click', async () => {
+  const nombre = $('da-nombre').value.trim();
+  const email = $('da-email').value.trim();
+  $('da-error').textContent = '';
+  if (!nombre || !email) { $('da-error').textContent = 'El nombre y el correo son obligatorios.'; return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { $('da-error').textContent = 'Escribe un correo válido.'; return; }
+  const b = $('da-crear');
+  b.disabled = true; b.textContent = 'Creando…';
+  try {
+    const r = await Nube.darAcceso({
+      solicitudId: solicitudEnCurso, email, nombre,
+      tipo: $('da-tipo').value, etapa: $('da-etapa').value, ruralidad: $('da-ruralidad').value,
+      num_alumnos: $('da-alumnos').value ? +$('da-alumnos').value : null
+    });
+    $('da-r-email').textContent = r.email;
+    $('da-r-pass').textContent = r.tempPassword;
+    $('dar-acceso-form').style.display = 'none';
+    $('dar-acceso-result').style.display = 'block';
+    Nube.listarSolicitudes().then(s => s && actualizarBadgeSolicitudes(s.length));
+  } catch (err) {
+    $('da-error').textContent = err.message;
+  }
+  b.disabled = false; b.textContent = 'Crear cuenta y dar acceso';
+});
+
 /* ---- Vista Centros y patios (solo admin) ---- */
 async function pintarCentros() {
   const cont = $('contenido-centros');
@@ -4943,6 +5042,7 @@ async function pintarSolicitudes() {
     cont.innerHTML = '<div class="tarjeta">No hay solicitudes pendientes. 🎉</div>';
     return;
   }
+  _solicitudesCache = solicitudes;
   const filas = solicitudes.map(s => `<div class="solicitud-fila">
     <div>
       <strong>${esc(s.centro)}</strong>
@@ -4950,19 +5050,40 @@ async function pintarSolicitudes() {
       ${s.mensaje ? `<div class="datos" style="margin-top:2px;">“${esc(s.mensaje)}”</div>` : ''}
       <div class="datos">Solicitada el ${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
     </div>
-    <button class="boton secundario pequeno" data-atender="${s.id}">✓ Marcar atendida</button>
+    <div class="acciones">
+      <button class="boton pequeno" data-dar="${s.id}">✓ Dar acceso</button>
+      <button class="boton secundario pequeno" data-atender="${s.id}">Descartar</button>
+    </div>
   </div>`).join('');
   cont.innerHTML = `<div class="tarjeta" style="border-left:4px solid var(--z-cognitiva);">
     <h4 style="margin-bottom:8px;">${solicitudes.length} solicitud${solicitudes.length === 1 ? '' : 'es'} pendiente${solicitudes.length === 1 ? '' : 's'}</h4>
-    <p class="ayuda" style="margin-bottom:10px;">Para dar acceso: en Supabase crea el usuario (Authentication → Users) y da de alta el centro y su fila en <code>usuarios</code> (ver <code>schema.sql</code>); después marca la solicitud como atendida.</p>
+    <p class="ayuda" style="margin-bottom:10px;"><strong>Dar acceso</strong> crea la cuenta y el centro automáticamente y te da una contraseña temporal para el centro. <strong>Descartar</strong> solo quita la solicitud de la lista (por si es spam o duplicada).</p>
     ${filas}
   </div>`;
+  cont.querySelectorAll('[data-dar]').forEach(b => b.addEventListener('click', () => {
+    const s = _solicitudesCache.find(x => x.id === b.dataset.dar);
+    if (s) abrirDarAcceso(s);
+  }));
   cont.querySelectorAll('[data-atender]').forEach(b => b.addEventListener('click', async () => {
     b.disabled = true;
     await Nube.marcarSolicitud(b.dataset.atender);
-    avisar('Solicitud marcada como atendida.');
+    avisar('Solicitud descartada.');
     pintarSolicitudes();
   }));
+}
+let _solicitudesCache = [];
+
+/* ---- Modal "Dar acceso": crea la cuenta del centro vía Edge Function ---- */
+let solicitudEnCurso = null;
+function abrirDarAcceso(s) {
+  solicitudEnCurso = s.id || null;
+  $('da-nombre').value = s.centro || '';
+  $('da-email').value = s.email || '';
+  $('da-tipo').value = ''; $('da-etapa').value = ''; $('da-ruralidad').value = ''; $('da-alumnos').value = '';
+  $('da-error').textContent = '';
+  $('dar-acceso-form').style.display = 'block';
+  $('dar-acceso-result').style.display = 'none';
+  $('velo-dar-acceso').classList.add('visible');
 }
 
 // Contador junto al botón ✉️ Solicitudes del menú
