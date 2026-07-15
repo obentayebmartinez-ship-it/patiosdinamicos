@@ -649,19 +649,56 @@ body.modo-hoy .panel-hoy { display: block; }
   font-family: var(--fuente-cuerpo); color: #26313b;
   print-color-adjust: exact; -webkit-print-color-adjust: exact;
 }
-#hoja-formulario h1 { font-family: var(--fuente-titulo); font-size: 20px; }
-#hoja-formulario .sub { font-size: 12px; color: #5c6670; margin: 2px 0 10px; }
-#hoja-formulario .item-papel { border: 1.5px solid #d8d5cc; border-radius: 8px; padding: 8px 12px; margin-top: 9px; page-break-inside: avoid; }
-#hoja-formulario .item-papel .pregunta { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
-#hoja-formulario .escala-papel { display: flex; gap: 8px; }
-#hoja-formulario .escala-papel .opcion { flex: 1; text-align: center; }
-#hoja-formulario .escala-papel .cara { font-size: 26px; line-height: 1.2; }
-#hoja-formulario .escala-papel .circulo {
-  width: 17px; height: 17px; border: 2px solid #26313b; border-radius: 50%;
-  display: inline-block; margin-top: 3px;
+#hoja-formulario .cab-papel {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  border-bottom: 3px solid #26313b; padding-bottom: 8px;
 }
-#hoja-formulario .pie-papel { font-size: 10.5px; color: #5c6670; margin-top: 10px; }
+#hoja-formulario h1 { font-family: var(--fuente-titulo); font-size: 23px; line-height: 1.1; }
+#hoja-formulario .sub { font-size: 11.5px; color: #5c6670; margin-top: 4px; }
+#hoja-formulario .datos-papel { display: flex; gap: 8px; flex: none; }
+#hoja-formulario .dato-papel {
+  border: 1.5px solid #d8d5cc; border-radius: 8px; padding: 4px 10px 5px; min-width: 32mm;
+}
+#hoja-formulario .dato-papel .etiq {
+  font-size: 8.5px; text-transform: uppercase; letter-spacing: .06em; color: #5c6670;
+}
+#hoja-formulario .dato-papel .valor {
+  font-family: var(--fuente-titulo); font-size: 15px; font-weight: 800; min-height: 19px;
+}
+#hoja-formulario .instruccion-papel {
+  background: #f1eee7; border-radius: 8px; padding: 7px 11px; font-size: 12.5px; margin: 10px 0 2px;
+}
+#hoja-formulario .items-papel { list-style: none; }
+#hoja-formulario .item-papel {
+  display: flex; align-items: center; gap: 14px;
+  border: 1.5px solid #d8d5cc; border-radius: 10px; padding: 6px 12px; margin-top: 8px;
+  page-break-inside: avoid;
+}
+#hoja-formulario .item-papel .pregunta {
+  flex: 1; display: flex; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 700;
+}
+#hoja-formulario .item-papel .num {
+  flex: none; width: 19px; height: 19px; border-radius: 50%; background: #26313b; color: #fff;
+  font-size: 11px; font-weight: 700; text-align: center; line-height: 19px;
+}
+#hoja-formulario .escala-papel { flex: none; width: 88mm; display: flex; gap: 6px; }
+#hoja-formulario .escala-papel .opcion {
+  flex: 1; text-align: center; border: 1px solid #e6e3db; border-radius: 8px; padding: 3px 0 5px;
+}
+#hoja-formulario .escala-papel .cara { font-size: 25px; line-height: 1.15; }
+#hoja-formulario .escala-papel .num-op { font-size: 9.5px; color: #5c6670; }
+#hoja-formulario .escala-papel .circulo {
+  width: 16px; height: 16px; border: 2px solid #26313b; border-radius: 50%;
+  display: inline-block; margin-top: 2px;
+}
+#hoja-formulario .pie-papel {
+  font-size: 10.5px; color: #5c6670; margin-top: 12px;
+  border-top: 1px solid #d8d5cc; padding-top: 6px;
+}
 @media print {
+  /* El body es la rejilla de la app (menú 232px + contenido). Sin volver a
+     bloque, la hoja se imprime dentro de la columna del menú. */
+  body.formulario-abierto { display: block; height: auto; overflow: visible; background: #fff; }
   body.formulario-abierto > :not(#hoja-formulario) { display: none !important; }
   body.formulario-abierto #hoja-formulario { display: block; }
 }
@@ -3816,22 +3853,33 @@ function imprimirFormularioPapel(colectivo, curso) {
   const esAlumnado = colectivo === 'alumnado';
   const items = ITEMS_ENCUESTA[colectivo];
   const escala = `<div class="escala-papel">${ESCALA_LIKERT.map((cara, v) =>
-    `<div class="opcion"><div class="cara">${cara}</div><div style="font-size:10px; color:#5c6670;">${v + 1}</div><span class="circulo"></span></div>`).join('')}</div>`;
+    `<div class="opcion"><div class="cara">${cara}</div><div class="num-op">${v + 1}</div><span class="circulo"></span></div>`).join('')}</div>`;
+  const campo = (etiq, valor) => `<div class="dato-papel">
+    <div class="etiq">${etiq}</div><div class="valor">${valor}</div>
+  </div>`;
 
   $('hoja-formulario').innerHTML = `<div class="form-papel">
-    <h1>${esAlumnado ? '¿Cómo va el patio? 🛝' : 'Encuesta al profesorado · patios dinámicos'}</h1>
-    <div class="sub">
-      Encuesta <strong>anónima</strong> — no escribas tu nombre.
-      ${esAlumnado ? (curso ? `Curso: <strong>${esc(curso)}</strong>` : 'Curso: ________________') : 'Colectivo: claustro'}
-      · ${trimestreActual()} · Patios Dinámicos La Rioja
-    </div>
-    ${esAlumnado
-      ? '<div class="sub">Rodea o marca la carita que más se parezca a ti en cada pregunta.</div>'
-      : '<div class="sub">Marca tu grado de acuerdo: 1 = nada de acuerdo · 5 = totalmente de acuerdo.</div>'}
-    ${items.map((pregunta, i) => `<div class="item-papel">
-      <div class="pregunta">${i + 1}. ${pregunta}</div>
-      ${escala}
-    </div>`).join('')}
+    <header class="cab-papel">
+      <div>
+        <h1>${esAlumnado ? '¿Cómo va el patio? 🛝' : 'Encuesta al profesorado · patios dinámicos'}</h1>
+        <div class="sub">
+          Encuesta <strong>anónima</strong> — no escribas tu nombre · Patios Dinámicos La Rioja
+        </div>
+      </div>
+      <div class="datos-papel">
+        ${esAlumnado ? campo('Curso', curso ? esc(curso) : '') : campo('Colectivo', 'Claustro')}
+        ${campo('Trimestre', trimestreActual())}
+      </div>
+    </header>
+    <div class="instruccion-papel">${esAlumnado
+      ? 'Rodea o marca la carita que más se parezca a ti en cada pregunta. No hay respuestas buenas ni malas.'
+      : 'Marca tu grado de acuerdo con cada afirmación: <strong>1 = nada de acuerdo</strong> · <strong>5 = totalmente de acuerdo</strong>.'}</div>
+    <ol class="items-papel">
+      ${items.map((pregunta, i) => `<li class="item-papel">
+        <div class="pregunta"><span class="num">${i + 1}</span>${pregunta}</div>
+        ${escala}
+      </li>`).join('')}
+    </ol>
     <div class="pie-papel">Al terminar, entrega la hoja doblada. Los resultados se cuentan por curso, nunca por persona.</div>
   </div>`;
 
