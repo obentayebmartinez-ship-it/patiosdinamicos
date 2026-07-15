@@ -342,6 +342,15 @@ button.enlace {
 
 /* ---------- Tutorial (diapositivas de bienvenida) ---------- */
 #velo-tutorial { z-index: 2200; } /* por encima del modal de acceso */
+/* Confirmación de solicitud enviada (modal de inicio) */
+.confirmacion { text-align: center; padding: 6px 4px 0; }
+.confirmacion .marca-ok {
+  width: 62px; height: 62px; margin: 0 auto 12px; border-radius: 50%;
+  background: #e3f3e9; display: flex; align-items: center; justify-content: center; font-size: 30px;
+}
+.confirmacion h2 { margin-bottom: 8px; }
+.confirmacion .detalle { font-size: 13px; color: var(--tinta-suave); line-height: 1.5; margin-top: 8px; }
+
 .modal-tutorial { width: min(440px, 94vw); padding: 0; overflow: hidden; }
 .tuto-ilustracion {
   height: 190px; display: flex; align-items: center; justify-content: center; position: relative;
@@ -1209,6 +1218,26 @@ body.modo-hoy .panel-hoy { display: block; }
       </div>
       <p style="text-align:center; margin-top:14px;">
         <button class="enlace" id="btn-sol-volver">← Volver a entrar</button>
+      </p>
+    </div>
+    <!-- Solicitud enviada (confirmación) -->
+    <div id="bienvenida-enviada" style="display:none;">
+      <div class="confirmacion">
+        <div class="marca-ok">✅</div>
+        <h2>Tu solicitud se ha enviado</h2>
+        <p class="detalle">
+          Hemos recibido la solicitud de <strong id="enviada-centro"></strong>.
+        </p>
+        <p class="detalle">
+          Recibirás la respuesta en <strong id="enviada-email"></strong>. Si aprobamos el acceso,
+          ese mismo correo traerá la contraseña para entrar. Revisa también la carpeta de spam.
+        </p>
+      </div>
+      <div style="margin-top:16px;">
+        <button class="boton" id="btn-enviada-volver" style="width:100%;">Entendido</button>
+      </div>
+      <p style="text-align:center; margin-top:14px;">
+        <button class="enlace" id="btn-enviada-demo">Mientras tanto, explorar en modo demostración</button>
       </p>
     </div>
     <!-- Modo demostración (secundario) -->
@@ -4918,8 +4947,10 @@ async function enviarSolicitudCuenta() {
     });
     ['sol-centro', 'sol-contacto', 'sol-email', 'sol-mensaje', 'sol-alumnos'].forEach(id => $(id).value = '');
     ['sol-tipo', 'sol-etapa', 'sol-ruralidad'].forEach(id => $(id).value = '');
-    mostrarVistaInicio('login');
-    avisar('Solicitud enviada. Te contactaremos por correo. ¡Gracias!');
+    // Confirmación dentro del modal: un toast pasa desapercibido y parece que no se envió nada.
+    $('enviada-centro').textContent = centro;
+    $('enviada-email').textContent = email;
+    mostrarVistaInicio('enviada');
   } catch (err) {
     $('sol-error').textContent = err.message;
   }
@@ -5011,10 +5042,11 @@ function aplicarPerfil(p) {
   $('velo-perfil').classList.remove('visible');
 }
 
-// Cambia entre las sub-vistas del modal de inicio: 'login' | 'solicitud' | 'demo'
+// Sub-vistas del modal de inicio: 'login' | 'solicitud' | 'enviada' | 'demo'
 function mostrarVistaInicio(cual) {
   $('bienvenida-login').style.display = cual === 'login' ? 'block' : 'none';
   $('bienvenida-solicitud').style.display = cual === 'solicitud' ? 'block' : 'none';
+  $('bienvenida-enviada').style.display = cual === 'enviada' ? 'block' : 'none';
   $('bienvenida-demo').style.display = cual === 'demo' ? 'block' : 'none';
 }
 
@@ -5031,6 +5063,8 @@ $('login-clave').addEventListener('keydown', e => { if (e.key === 'Enter') login
 $('btn-ver-demo').addEventListener('click', () => mostrarVistaInicio('demo'));
 $('btn-ver-solicitud').addEventListener('click', () => { $('sol-error').textContent = ''; mostrarVistaInicio('solicitud'); });
 $('btn-sol-volver').addEventListener('click', () => mostrarVistaInicio('login'));
+$('btn-enviada-volver').addEventListener('click', () => mostrarVistaInicio('login'));
+$('btn-enviada-demo').addEventListener('click', () => mostrarVistaInicio('demo'));
 $('btn-volver-login').addEventListener('click', () => mostrarVistaInicio('login'));
 $('btn-sol-enviar').addEventListener('click', enviarSolicitudCuenta);
 
