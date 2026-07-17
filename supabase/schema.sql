@@ -134,6 +134,18 @@ alter table solicitudes_cuenta add column if not exists etapa text;
 alter table solicitudes_cuenta add column if not exists ruralidad text;
 alter table solicitudes_cuenta add column if not exists num_alumnos int;
 
+-- Solicitudes de recuperación de contraseña: un centro que ya tiene cuenta pero
+-- ha olvidado la contraseña la pide desde el login (sin estar autenticado). El
+-- admin la ve y regenera una contraseña temporal (Edge Function). No se guarda
+-- ninguna contraseña aquí: solo el correo con el que el centro dice entrar.
+create table if not exists solicitudes_clave (
+  id       uuid primary key default gen_random_uuid(),
+  centro   text,
+  email    text not null,
+  atendida boolean not null default false,
+  creada   timestamptz not null default now()
+);
+
 -- ------------------------------------------------------------
 -- Funciones auxiliares para las políticas.
 -- SECURITY DEFINER: leen `usuarios` sin pasar por su propio RLS
@@ -155,6 +167,7 @@ $$ select coalesce((select rol = 'admin' from usuarios where id = auth.uid()), f
 alter table centros           enable row level security;
 alter table usuarios          enable row level security;
 alter table solicitudes_cuenta enable row level security;
+alter table solicitudes_clave  enable row level security;
 alter table patios            enable row level security;
 alter table incidencias       enable row level security;
 alter table ocupaciones       enable row level security;
@@ -179,6 +192,20 @@ create policy solicitudes_admin_select on solicitudes_cuenta
   for select using (soy_admin());
 drop policy if exists solicitudes_admin_update on solicitudes_cuenta;
 create policy solicitudes_admin_update on solicitudes_cuenta
+  for update using (soy_admin()) with check (soy_admin());
+
+-- solicitudes_clave: mismas reglas — cualquiera (incluido anónimo, desde el
+-- login "he olvidado la contraseña") la CREA; solo el admin la lee y la marca.
+grant insert on solicitudes_clave to anon, authenticated;
+grant select, update on solicitudes_clave to authenticated;
+drop policy if exists solicitudes_clave_insert on solicitudes_clave;
+create policy solicitudes_clave_insert on solicitudes_clave
+  for insert with check (true);
+drop policy if exists solicitudes_clave_admin_select on solicitudes_clave;
+create policy solicitudes_clave_admin_select on solicitudes_clave
+  for select using (soy_admin());
+drop policy if exists solicitudes_clave_admin_update on solicitudes_clave;
+create policy solicitudes_clave_admin_update on solicitudes_clave
   for update using (soy_admin()) with check (soy_admin());
 
 -- centros: un centro ve su ficha; el admin las ve todas y las gestiona.

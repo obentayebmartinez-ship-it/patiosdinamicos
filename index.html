@@ -1181,7 +1181,10 @@ body.modo-hoy .panel-hoy { display: block; }
       <div style="margin-top:14px;">
         <button class="boton" id="btn-login-entrar" style="width:100%;">Entrar</button>
       </div>
-      <p style="font-size:13px; color:var(--tinta-suave); text-align:center; margin-top:16px;">
+      <p style="font-size:12.5px; color:var(--tinta-suave); text-align:center; margin-top:10px;">
+        <button class="enlace" id="btn-ver-recuperar">¿Has olvidado tu contraseña?</button>
+      </p>
+      <p style="font-size:13px; color:var(--tinta-suave); text-align:center; margin-top:12px;">
         ¿Tu centro quiere participar? <button class="enlace" id="btn-ver-solicitud">Solicitar una cuenta</button>
       </p>
       <p style="font-size:12px; color:var(--tinta-suave); text-align:center; margin-top:4px;">
@@ -1239,6 +1242,41 @@ body.modo-hoy .panel-hoy { display: block; }
       <p style="text-align:center; margin-top:14px;">
         <button class="enlace" id="btn-enviada-demo">Mientras tanto, explorar en modo demostración</button>
       </p>
+    </div>
+    <!-- He olvidado la contraseña -->
+    <div id="bienvenida-recuperar" style="display:none;">
+      <h2>¿Has olvidado tu contraseña?</h2>
+      <p style="font-size:13px; color:var(--tinta-suave); margin-bottom:6px;">
+        No pasa nada, es de lo más normal. Déjanos el <strong>correo con el que entra tu centro</strong> y
+        te enviaremos una contraseña nueva. Por seguridad, la contraseña anterior no se puede recuperar: se genera otra.
+      </p>
+      <div class="campo-nube"><label for="rec-centro">Centro (opcional)</label>
+        <input type="text" id="rec-centro" maxlength="90" placeholder="ej. CEIP San Prudencio"></div>
+      <div class="campo-nube"><label for="rec-email">Correo de tu cuenta *</label>
+        <input type="email" id="rec-email" autocomplete="username" placeholder="centro@ejemplo.org"></div>
+      <div class="login-error" id="rec-error"></div>
+      <div style="margin-top:14px;">
+        <button class="boton" id="btn-rec-enviar" style="width:100%;">Enviar solicitud</button>
+      </div>
+      <p style="text-align:center; margin-top:14px;">
+        <button class="enlace" id="btn-rec-volver">← Volver a entrar</button>
+      </p>
+    </div>
+    <!-- Solicitud de contraseña enviada (confirmación) -->
+    <div id="bienvenida-clave-enviada" style="display:none;">
+      <div class="confirmacion">
+        <div class="marca-ok">✅</div>
+        <h2>Solicitud recibida</h2>
+        <p class="detalle">
+          Hemos recibido tu petición de contraseña para <strong id="clave-enviada-email"></strong>.
+        </p>
+        <p class="detalle">
+          En cuanto la revisemos te enviaremos una contraseña nueva a ese correo. Revisa también la carpeta de spam.
+        </p>
+      </div>
+      <div style="margin-top:16px;">
+        <button class="boton" id="btn-clave-enviada-volver" style="width:100%;">Entendido</button>
+      </div>
     </div>
     <!-- Modo demostración (secundario) -->
     <div id="bienvenida-demo" style="display:none;">
@@ -1309,6 +1347,19 @@ body.modo-hoy .panel-hoy { display: block; }
         <button class="boton secundario" id="da-copiar">📋 Copiar credenciales</button>
         <button class="boton" id="da-cerrar">Hecho</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Modal: credenciales de un centro (admin) ===================== -->
+<div class="velo" id="velo-credenciales">
+  <div class="modal">
+    <h2>🔑 Credenciales del centro</h2>
+    <p style="font-size:12.5px; color:var(--tinta-suave);" id="cred-centro-nombre"></p>
+    <p style="font-size:12px; color:var(--tinta-suave);">La contraseña no se puede consultar (está cifrada). Si el centro la ha olvidado, pulsa <strong>Regenerar contraseña</strong>: se creará una nueva para pasársela.</p>
+    <div id="cred-lista"><p class="ayuda">Cargando…</p></div>
+    <div class="pie-modal">
+      <button class="boton secundario" id="cred-cerrar">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1820,6 +1871,29 @@ const Nube = {
     await this.cliente.from('solicitudes_cuenta').update({ atendida: true }).eq('id', id);
   },
 
+  // Recuperación de contraseña desde el login (sin sesión): un centro que ya
+  // tiene cuenta pero olvidó la clave la pide con su correo. La lee/resuelve
+  // solo el admin (tabla solicitudes_clave con su RLS).
+  async enviarSolicitudClave({ centro, email }) {
+    if (!this.cliente) throw new Error('La nube no está configurada en esta instalación.');
+    if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
+    const { error } = await this.cliente.from('solicitudes_clave')
+      .insert({ centro: centro || null, email });
+    if (error) throw new Error('No se pudo enviar la solicitud: ' + error.message);
+  },
+
+  async listarSolicitudesClave() {
+    if (!this.esAdmin() || !this.cliente || !navigator.onLine) return null;
+    const { data, error } = await this.cliente.from('solicitudes_clave')
+      .select('*').eq('atendida', false).order('creada', { ascending: false });
+    return error ? null : data;
+  },
+
+  async marcarSolicitudClave(id) {
+    if (!this.esAdmin()) return;
+    await this.cliente.from('solicitudes_clave').update({ atendida: true }).eq('id', id);
+  },
+
   // Sella la última conexión del centro (fire-and-forget). Necesita la columna
   // centros.ultima_conexion y la política centros_update_propio (ver schema.sql);
   // si faltan, falla en silencio sin afectar al uso normal.
@@ -1867,6 +1941,43 @@ const Nube = {
     }
     if (data && data.error) throw new Error(data.error);
     this._cacheRegional = null; // el nuevo centro aparecerá en las vistas regionales
+    return data;
+  },
+
+  // Correos (usuario de acceso) de las cuentas de un centro. La contraseña NO
+  // se puede leer nunca (está cifrada en Supabase); solo se puede regenerar con
+  // `restablecerClave`. Devuelve { cuentas: [{ id, email, ultimo_acceso }] }.
+  async credencialesCentro(centroId) {
+    if (!this.esAdmin()) throw new Error('Solo un administrador puede ver las credenciales.');
+    if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
+    return this._invocarFuncion({ accion: 'credenciales-centro', centro_id: centroId });
+  },
+
+  // Genera una contraseña temporal nueva para la cuenta de un centro (cuando la
+  // ha olvidado). Se puede localizar por centro_id, por uid o por email.
+  // Devuelve { email, tempPassword }.
+  async restablecerClave({ centroId, uid, email, solicitudId } = {}) {
+    if (!this.esAdmin()) throw new Error('Solo un administrador puede regenerar contraseñas.');
+    if (!navigator.onLine) throw new Error('Sin conexión: inténtalo cuando vuelva internet.');
+    return this._invocarFuncion({
+      accion: 'restablecer-clave',
+      centro_id: centroId || null, uid: uid || null, email: email || null, solicitud_id: solicitudId || null
+    });
+  },
+
+  // Llama a la Edge Function y normaliza los errores (mismo tratamiento que
+  // darAcceso/borrarCentro). Devuelve el cuerpo JSON de la respuesta.
+  async _invocarFuncion(body) {
+    const { data, error } = await this.cliente.functions.invoke(NUBE_FUNCION_DAR_ACCESO, { body });
+    if (error) {
+      let msg = error.message || 'No se pudo completar la operación.';
+      try { const c = await error.context.json(); if (c && c.error) msg = c.error; } catch (e) { /* sin cuerpo JSON */ }
+      if (/Failed to send|Failed to fetch|not found|404|Acción no reconocida/i.test(msg)) {
+        msg = 'La función de Supabase no está actualizada (falta esta acción). Vuelve a desplegar el index.ts (ver README).';
+      }
+      throw new Error(msg);
+    }
+    if (data && data.error) throw new Error(data.error);
     return data;
   },
 
@@ -4957,6 +5068,26 @@ async function enviarSolicitudCuenta() {
   b.disabled = false; b.textContent = 'Enviar solicitud';
 }
 
+// Enviar una solicitud de recuperación de contraseña (login → "¿Has olvidado…?")
+async function enviarSolicitudClave() {
+  const email = $('rec-email').value.trim();
+  const centro = $('rec-centro').value.trim();
+  $('rec-error').textContent = '';
+  if (!email) { $('rec-error').textContent = 'Escribe el correo de tu cuenta.'; return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { $('rec-error').textContent = 'Escribe un correo válido.'; return; }
+  const b = $('btn-rec-enviar');
+  b.disabled = true; b.textContent = 'Enviando…';
+  try {
+    await Nube.enviarSolicitudClave({ centro, email });
+    $('rec-centro').value = ''; $('rec-email').value = '';
+    $('clave-enviada-email').textContent = email;
+    mostrarVistaInicio('clave-enviada');
+  } catch (err) {
+    $('rec-error').textContent = err.message;
+  }
+  b.disabled = false; b.textContent = 'Enviar solicitud';
+}
+
 // Acceso por cuenta, compartido por el modal de inicio y la tarjeta del editor
 async function procesarLogin({ emailEl, claveEl, btn, errEl }) {
   const email = ($(emailEl).value || '').trim();
@@ -4980,7 +5111,7 @@ async function procesarLogin({ emailEl, claveEl, btn, errEl }) {
     } else if (Nube.esAdmin()) {
       avisar('Conectado como orientación regional: las vistas de la red muestran los centros reales.');
       Nube.datosRegionales(); // precargar
-      Nube.listarSolicitudes().then(s => s && actualizarBadgeSolicitudes(s.length));
+      refrescarBadgeSolicitudes();
     }
   } catch (err) {
     btn.disabled = false; btn.textContent = textoOrig;
@@ -5042,11 +5173,14 @@ function aplicarPerfil(p) {
   $('velo-perfil').classList.remove('visible');
 }
 
-// Sub-vistas del modal de inicio: 'login' | 'solicitud' | 'enviada' | 'demo'
+// Sub-vistas del modal de inicio:
+// 'login' | 'solicitud' | 'enviada' | 'recuperar' | 'clave-enviada' | 'demo'
 function mostrarVistaInicio(cual) {
   $('bienvenida-login').style.display = cual === 'login' ? 'block' : 'none';
   $('bienvenida-solicitud').style.display = cual === 'solicitud' ? 'block' : 'none';
   $('bienvenida-enviada').style.display = cual === 'enviada' ? 'block' : 'none';
+  $('bienvenida-recuperar').style.display = cual === 'recuperar' ? 'block' : 'none';
+  $('bienvenida-clave-enviada').style.display = cual === 'clave-enviada' ? 'block' : 'none';
   $('bienvenida-demo').style.display = cual === 'demo' ? 'block' : 'none';
 }
 
@@ -5067,6 +5201,15 @@ $('btn-enviada-volver').addEventListener('click', () => mostrarVistaInicio('logi
 $('btn-enviada-demo').addEventListener('click', () => mostrarVistaInicio('demo'));
 $('btn-volver-login').addEventListener('click', () => mostrarVistaInicio('login'));
 $('btn-sol-enviar').addEventListener('click', enviarSolicitudCuenta);
+$('btn-ver-recuperar').addEventListener('click', () => {
+  $('rec-error').textContent = '';
+  $('rec-email').value = $('login-email').value.trim(); // reaprovecha lo ya escrito
+  mostrarVistaInicio('recuperar');
+});
+$('btn-rec-volver').addEventListener('click', () => mostrarVistaInicio('login'));
+$('btn-clave-enviada-volver').addEventListener('click', () => mostrarVistaInicio('login'));
+$('btn-rec-enviar').addEventListener('click', enviarSolicitudClave);
+$('rec-email').addEventListener('keydown', e => { if (e.key === 'Enter') enviarSolicitudClave(); });
 
 /* ============================================================
    TUTORIAL — diapositivas de bienvenida (se abre desde el login)
@@ -5181,12 +5324,80 @@ $('da-crear').addEventListener('click', async () => {
     $('da-r-pass').textContent = r.tempPassword;
     $('dar-acceso-form').style.display = 'none';
     $('dar-acceso-result').style.display = 'block';
-    Nube.listarSolicitudes().then(s => s && actualizarBadgeSolicitudes(s.length));
+    refrescarBadgeSolicitudes();
   } catch (err) {
     $('da-error').textContent = err.message;
   }
   b.disabled = false; b.textContent = 'Crear cuenta y dar acceso';
 });
+
+/* ---- Modal "Credenciales": ver el correo de acceso y regenerar contraseña ---- */
+$('cred-cerrar').addEventListener('click', () => $('velo-credenciales').classList.remove('visible'));
+
+async function abrirCredenciales(centroId, nombre) {
+  $('cred-centro-nombre').textContent = nombre || '';
+  $('cred-lista').innerHTML = '<p class="ayuda">Cargando…</p>';
+  $('velo-credenciales').classList.add('visible');
+  let r;
+  try {
+    r = await Nube.credencialesCentro(centroId);
+  } catch (e) {
+    $('cred-lista').innerHTML = `<p class="login-error" style="display:block;">${esc(e.message)}</p>`;
+    return;
+  }
+  const cuentas = (r && r.cuentas) || [];
+  if (!cuentas.length) {
+    $('cred-lista').innerHTML = '<p class="ayuda">Este centro no tiene ninguna cuenta de acceso asociada.</p>';
+    return;
+  }
+  $('cred-lista').innerHTML = cuentas.map((c, i) => `
+    <div class="credenciales cred-cuenta" data-fila="${i}" style="margin-top:10px;">
+      <div><span class="datos">Correo (usuario de acceso)</span><div class="cred-valor">${esc(c.email || '—')}</div></div>
+      <div><span class="datos">Último acceso</span><div>${c.ultimo_acceso ? haceCuanto(c.ultimo_acceso) : 'sin registro'}</div></div>
+      <div class="cred-nueva" style="display:none; margin-top:6px;">
+        <span class="datos">Contraseña temporal nueva</span><div class="cred-valor cred-pass"></div>
+      </div>
+      <div class="fila-botones" style="margin-top:8px; flex-wrap:wrap;">
+        <button class="boton secundario pequeno" data-regenerar="${c.id}" data-email="${esc(c.email || '')}">🔁 Regenerar contraseña</button>
+        <button class="boton secundario pequeno cred-copiar" style="display:none;">📋 Copiar credenciales</button>
+      </div>
+    </div>`).join('');
+
+  $('cred-lista').querySelectorAll('[data-regenerar]').forEach(b => {
+    const fila = b.closest('.cred-cuenta');
+    let armado = false, t = null;
+    b.addEventListener('click', async () => {
+      if (!armado) {
+        armado = true;
+        b.textContent = '¿Seguro? Anula la contraseña actual';
+        b.classList.add('peligro');
+        t = setTimeout(() => { armado = false; b.textContent = '🔁 Regenerar contraseña'; b.classList.remove('peligro'); }, 4500);
+        return;
+      }
+      clearTimeout(t); armado = false; b.classList.remove('peligro');
+      b.disabled = true; b.textContent = 'Regenerando…';
+      try {
+        const res = await Nube.restablecerClave({ uid: b.dataset.regenerar });
+        fila.querySelector('.cred-pass').textContent = res.tempPassword;
+        fila.querySelector('.cred-nueva').style.display = 'block';
+        const btnCopiar = fila.querySelector('.cred-copiar');
+        btnCopiar.style.display = '';
+        btnCopiar.onclick = () => copiarCredenciales(b.dataset.email, res.tempPassword);
+        b.textContent = '🔁 Regenerar de nuevo';
+      } catch (e) {
+        avisar('No se pudo regenerar: ' + e.message);
+        b.textContent = '🔁 Regenerar contraseña';
+      }
+      b.disabled = false;
+    });
+  });
+}
+
+async function copiarCredenciales(email, pass) {
+  const texto = `Patios Dinámicos · acceso de tu centro\nWeb: ${location.origin}\nCorreo: ${email}\nContraseña temporal: ${pass}`;
+  try { await navigator.clipboard.writeText(texto); avisar('Credenciales copiadas al portapapeles.'); }
+  catch (e) { avisar('Copia manualmente: no se pudo acceder al portapapeles.'); }
+}
 
 /* ---- Vista Centros y patios (solo admin) ---- */
 async function pintarCentros() {
@@ -5252,6 +5463,7 @@ async function pintarCentros() {
         </ul>
         <div class="acciones">
           <button class="boton secundario pequeno" data-detalle="${c.id}">🔍 Supervisar</button>
+          <button class="boton secundario pequeno" data-credenciales="${c.id}" data-nombre="${esc(c.nombre)}">🔑 Credenciales</button>
           <button class="boton secundario pequeno" data-borrar="${c.id}" data-nombre="${esc(c.nombre)}">🗑️ Borrar</button>
         </div>
       </div>`;
@@ -5277,6 +5489,7 @@ async function pintarCentros() {
     document.querySelector('nav.principal button[data-vista="vista-editor"]').click();
   }));
   cont.querySelectorAll('[data-detalle]').forEach(b => b.addEventListener('click', () => pintarDetalleCentro(b.dataset.detalle)));
+  cont.querySelectorAll('[data-credenciales]').forEach(b => b.addEventListener('click', () => abrirCredenciales(b.dataset.credenciales, b.dataset.nombre)));
 
   // Borrar centro: dos toques (el primero arma, el segundo ejecuta)
   cont.querySelectorAll('[data-borrar]').forEach(b => {
@@ -5427,36 +5640,70 @@ async function pintarDetalleCentro(centroId) {
 async function pintarSolicitudes() {
   const cont = $('contenido-solicitudes');
   cont.innerHTML = '<p class="ayuda">Cargando solicitudes…</p>';
-  const solicitudes = await Nube.listarSolicitudes();
+  const [solicitudes, claves] = await Promise.all([Nube.listarSolicitudes(), Nube.listarSolicitudesClave()]);
   if (solicitudes === null) {
     cont.innerHTML = '<div class="tarjeta">No se pudieron cargar las solicitudes (¿sin conexión, o falta ejecutar el <code>schema.sql</code> en Supabase?).</div>';
     return;
   }
-  actualizarBadgeSolicitudes(solicitudes.length);
-  if (!solicitudes.length) {
+  const clavesLista = claves || [];
+  actualizarBadgeSolicitudes(solicitudes.length + clavesLista.length);
+  if (!solicitudes.length && !clavesLista.length) {
     cont.innerHTML = '<div class="tarjeta">No hay solicitudes pendientes. 🎉</div>';
     return;
   }
   _solicitudesCache = solicitudes;
-  const filas = solicitudes.map(s => `<div class="solicitud-fila">
-    <div>
-      <strong>${esc(s.centro)}</strong>
-      <span class="datos"> · <a href="mailto:${esc(s.email)}">${esc(s.email)}</a>${s.contacto ? ' · ' + esc(s.contacto) : ''}</span>
-      ${[s.tipo, s.etapa, s.ruralidad, s.num_alumnos != null ? s.num_alumnos + ' alumnos' : ''].filter(Boolean).length
-        ? `<div class="datos" style="margin-top:2px;">${[s.tipo, s.etapa, s.ruralidad, s.num_alumnos != null ? s.num_alumnos + ' alumnos' : ''].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
-      ${s.mensaje ? `<div class="datos" style="margin-top:2px;">“${esc(s.mensaje)}”</div>` : ''}
-      <div class="datos">Solicitada el ${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-    </div>
-    <div class="acciones">
-      <button class="boton pequeno" data-dar="${s.id}">✓ Dar acceso</button>
-      <button class="boton secundario pequeno" data-atender="${s.id}">Descartar</button>
-    </div>
-  </div>`).join('');
-  cont.innerHTML = `<div class="tarjeta" style="border-left:4px solid var(--z-cognitiva);">
-    <h4 style="margin-bottom:8px;">${solicitudes.length} solicitud${solicitudes.length === 1 ? '' : 'es'} pendiente${solicitudes.length === 1 ? '' : 's'}</h4>
-    <p class="ayuda" style="margin-bottom:10px;"><strong>Dar acceso</strong> crea la cuenta y el centro automáticamente y te da una contraseña temporal para el centro. <strong>Descartar</strong> solo quita la solicitud de la lista (por si es spam o duplicada).</p>
-    ${filas}
-  </div>`;
+  _clavesCache = clavesLista;
+  let html = '';
+
+  // --- Solicitudes de cuenta nueva ---
+  if (solicitudes.length) {
+    const filas = solicitudes.map(s => `<div class="solicitud-fila">
+      <div>
+        <strong>${esc(s.centro)}</strong>
+        <span class="datos"> · <a href="mailto:${esc(s.email)}">${esc(s.email)}</a>${s.contacto ? ' · ' + esc(s.contacto) : ''}</span>
+        ${[s.tipo, s.etapa, s.ruralidad, s.num_alumnos != null ? s.num_alumnos + ' alumnos' : ''].filter(Boolean).length
+          ? `<div class="datos" style="margin-top:2px;">${[s.tipo, s.etapa, s.ruralidad, s.num_alumnos != null ? s.num_alumnos + ' alumnos' : ''].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
+        ${s.mensaje ? `<div class="datos" style="margin-top:2px;">“${esc(s.mensaje)}”</div>` : ''}
+        <div class="datos">Solicitada el ${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+      </div>
+      <div class="acciones">
+        <button class="boton pequeno" data-dar="${s.id}">✓ Dar acceso</button>
+        <button class="boton secundario pequeno" data-atender="${s.id}">Descartar</button>
+      </div>
+    </div>`).join('');
+    html += `<div class="tarjeta" style="border-left:4px solid var(--z-cognitiva);">
+      <h4 style="margin-bottom:8px;">📝 ${solicitudes.length} solicitud${solicitudes.length === 1 ? '' : 'es'} de cuenta nueva</h4>
+      <p class="ayuda" style="margin-bottom:10px;"><strong>Dar acceso</strong> crea la cuenta y el centro automáticamente y te da una contraseña temporal para el centro. <strong>Descartar</strong> solo quita la solicitud de la lista (por si es spam o duplicada).</p>
+      ${filas}
+    </div>`;
+  }
+
+  // --- Solicitudes de recuperación de contraseña (el centro ya tiene cuenta) ---
+  if (clavesLista.length) {
+    const filas = clavesLista.map(s => `<div class="solicitud-fila" data-fila-clave="${s.id}">
+      <div>
+        <strong>${esc(s.centro || 'Centro sin indicar')}</strong>
+        <span class="datos"> · <a href="mailto:${esc(s.email)}">${esc(s.email)}</a></span>
+        <div class="datos">Pidió una contraseña nueva el ${new Date(s.creada).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+        <div class="credenciales cred-nueva" style="display:none; margin-top:6px;">
+          <span class="datos">Contraseña temporal nueva</span><div class="cred-valor cred-pass"></div>
+          <button class="boton secundario pequeno cred-copiar" style="margin-top:6px;">📋 Copiar credenciales</button>
+        </div>
+      </div>
+      <div class="acciones">
+        <button class="boton pequeno" data-regenerar-sol="${s.id}" data-email="${esc(s.email)}">🔁 Regenerar contraseña</button>
+        <button class="boton secundario pequeno" data-atender-clave="${s.id}">Descartar</button>
+      </div>
+    </div>`).join('');
+    html += `<div class="tarjeta" style="border-left:4px solid var(--z-deportiva); margin-top:14px;">
+      <h4 style="margin-bottom:8px;">🔑 ${clavesLista.length} solicitud${clavesLista.length === 1 ? '' : 'es'} de contraseña olvidada</h4>
+      <p class="ayuda" style="margin-bottom:10px;"><strong>Regenerar contraseña</strong> crea una contraseña nueva para ese centro (anula la anterior) para que se la pases. <strong>Descartar</strong> solo quita la solicitud (por si es duplicada o el correo no corresponde a ningún centro).</p>
+      ${filas}
+    </div>`;
+  }
+
+  cont.innerHTML = html;
+
   cont.querySelectorAll('[data-dar]').forEach(b => b.addEventListener('click', () => {
     const s = _solicitudesCache.find(x => x.id === b.dataset.dar);
     if (s) abrirDarAcceso(s);
@@ -5467,8 +5714,32 @@ async function pintarSolicitudes() {
     avisar('Solicitud descartada.');
     pintarSolicitudes();
   }));
+  cont.querySelectorAll('[data-atender-clave]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    await Nube.marcarSolicitudClave(b.dataset.atenderClave);
+    avisar('Solicitud descartada.');
+    pintarSolicitudes();
+  }));
+  cont.querySelectorAll('[data-regenerar-sol]').forEach(b => {
+    const fila = b.closest('[data-fila-clave]');
+    b.addEventListener('click', async () => {
+      b.disabled = true; b.textContent = 'Regenerando…';
+      try {
+        const res = await Nube.restablecerClave({ email: b.dataset.email, solicitudId: b.dataset.regenerarSol });
+        fila.querySelector('.cred-pass').textContent = res.tempPassword;
+        fila.querySelector('.cred-nueva').style.display = 'block';
+        fila.querySelector('.cred-copiar').onclick = () => copiarCredenciales(res.email || b.dataset.email, res.tempPassword);
+        b.textContent = '✅ Hecha (descarta al terminar)';
+        actualizarBadgeSolicitudes((_solicitudesCache.length) + (_clavesCache.length));
+      } catch (e) {
+        b.disabled = false; b.textContent = '🔁 Regenerar contraseña';
+        avisar('No se pudo regenerar: ' + e.message);
+      }
+    });
+  });
 }
 let _solicitudesCache = [];
+let _clavesCache = [];
 
 /* ---- Modal "Dar acceso": crea la cuenta del centro vía Edge Function ---- */
 let solicitudEnCurso = null;
@@ -5491,6 +5762,12 @@ function abrirDarAcceso(s) {
 function actualizarBadgeSolicitudes(n) {
   const b = $('btn-nav-solicitudes');
   if (b) b.textContent = n ? `✉️ Solicitudes (${n})` : '✉️ Solicitudes';
+}
+
+// Recuenta las dos clases de solicitud (cuenta nueva + contraseña olvidada).
+function refrescarBadgeSolicitudes() {
+  Promise.all([Nube.listarSolicitudes(), Nube.listarSolicitudesClave()])
+    .then(([a, c]) => { if (a) actualizarBadgeSolicitudes(a.length + ((c && c.length) || 0)); });
 }
 
 /* ============================================================
@@ -5553,7 +5830,7 @@ document.querySelectorAll('nav.principal button[data-vista]').forEach(b => {
         if (r === 'vacia') ofrecerSubida();
       } else if (Nube.esAdmin()) {
         Nube.datosRegionales(); // precargar para las vistas de la red
-        Nube.listarSolicitudes().then(s => s && actualizarBadgeSolicitudes(s.length));
+        refrescarBadgeSolicitudes();
       }
     } else if (!teniaPerfil) {
       abrirModalInicio();

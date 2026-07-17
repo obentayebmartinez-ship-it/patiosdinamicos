@@ -1,10 +1,15 @@
 // ============================================================
-// Edge Function (desplegada como "rapid-handler") — dos acciones,
+// Edge Function (desplegada como "rapid-handler") — varias acciones,
 // según el campo `accion` del cuerpo:
-//   • 'dar-acceso'    → crea la cuenta de un centro (usuario + centro +
-//                       vínculo) y devuelve una contraseña temporal.
-//   • 'borrar-centro' → borra un centro con TODOS sus datos y las cuentas
-//                       de acceso asociadas.
+//   • 'dar-acceso'         → crea la cuenta de un centro (usuario + centro +
+//                            vínculo) y devuelve una contraseña temporal.
+//   • 'borrar-centro'      → borra un centro con TODOS sus datos y las cuentas
+//                            de acceso asociadas.
+//   • 'credenciales-centro'→ devuelve los correos (usuario de acceso) de las
+//                            cuentas de un centro. La contraseña NO se puede
+//                            leer nunca (está cifrada); solo se puede regenerar.
+//   • 'restablecer-clave'  → genera una contraseña temporal nueva para la
+//                            cuenta de un centro (cuando la olvida) y la devuelve.
 // Vive en el servidor porque usa la clave maestra (service_role), que
 // NUNCA puede estar en el navegador. Solo un admin puede llamarla.
 //
@@ -33,6 +38,21 @@ function generarClave(): string {
   const arr = new Uint32Array(12);
   crypto.getRandomValues(arr);
   return Array.from(arr, (n) => chars[n % chars.length]).join('');
+}
+
+// Busca el id de la cuenta de Authentication por su correo. GoTrue no ofrece
+// "buscar por email", así que recorremos las páginas (para un piloto con pocos
+// centros sobra con las primeras). Devuelve null si no aparece.
+async function uidPorEmail(admin: any, email: string): Promise<string | null> {
+  const objetivo = email.trim().toLowerCase();
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error || !data?.users?.length) break;
+    const u = data.users.find((x: any) => (x.email ?? '').toLowerCase() === objetivo);
+    if (u) return u.id;
+    if (data.users.length < 200) break;
+  }
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -118,6 +138,40 @@ Deno.serve(async (req: Request) => {
         await admin.auth.admin.deleteUser(c.id);
       }
       return json({ ok: true });
+    }
+
+    // ---------- Acción: credenciales de un centro (correos de sus cuentas) ----------
+    if (accion === 'credenciales-centro') {
+      const centroId = body.centro_id;
+      if (!centroId) return json({ error: 'Falta el identificador del centro.' }, 400);
+      const { data: filas } = await admin.from('usuarios').select('id').eq('centro_id', centroId);
+      const cuentas = [];
+      for (const f of filas ?? []) {
+        const { data: u } = await admin.auth.admin.getUserById(f.id);
+        if (u?.user) cuentas.push({ id: f.id, email: u.user.email, ultimo_acceso: u.user.last_sign_in_at ?? null });
+      }
+      return json({ ok: true, cuentas });
+    }
+
+    // ---------- Acción: restablecer contraseña (el centro la olvidó) ----------
+    if (accion === 'restablecer-clave') {
+      let uid: string | null = body.uid ?? null;
+      const email = (body.email ?? '').trim();
+      if (!uid && body.centro_id) {
+        const { data: filas } = await admin.from('usuarios').select('id').eq('centro_id', body.centro_id).limit(1);
+        uid = filas?.[0]?.id ?? null;
+      }
+      if (!uid && email) uid = await uidPorEmail(admin, email);
+      if (!uid) return json({ error: 'No se encontró ninguna cuenta con ese centro o correo.' }, 404);
+
+      const tempPassword = generarClave();
+      const { data: upd, error: updErr } = await admin.auth.admin.updateUserById(uid, { password: tempPassword });
+      if (updErr) return json({ error: 'No se pudo cambiar la contraseña: ' + updErr.message }, 400);
+
+      if (body.solicitud_id) {
+        await admin.from('solicitudes_clave').update({ atendida: true }).eq('id', body.solicitud_id);
+      }
+      return json({ ok: true, email: upd?.user?.email ?? email, tempPassword });
     }
 
     return json({ error: 'Acción no reconocida.' }, 400);
